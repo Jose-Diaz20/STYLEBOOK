@@ -1,0 +1,72 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>{% block titulo %}StyleBook{% endblock %}</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@700;800&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/estilos.css') }}" />
+</head>
+<body>
+  {% set rol = session.get('rol') %}
+  <header class="barra">
+    <a href="{{ url_for('index') }}" class="marca">StyleBook</a>
+    <nav class="menu">
+      {# Menú según el tipo de cuenta: el catálogo es de clientes y visitantes; el proveedor ve solo su panel #}
+      {% set es_proveedor = rol in ['establecimiento', 'profesional'] %}
+      {% if not es_proveedor and rol != 'admin' %}
+        <a href="{{ url_for('servicios.catalogo') }}">Servicios</a>
+        <a href="{{ url_for('profesionales.listar') }}">Profesionales</a>
+      {% endif %}
+      {% if session.get('access_token') %}
+        {% if rol == 'cliente' %}
+          <a href="{{ url_for('citas.mis_citas') }}">Mis citas</a>
+        {% elif es_proveedor %}
+          <a href="{{ url_for('citas.agenda') }}">Mi agenda</a>
+          <a href="{{ url_for('servicios.gestionar') }}">Mis servicios</a>
+          <a href="{{ url_for('horarios.gestionar') }}">Mi horario</a>
+          <a href="{{ url_for('profesionales.editar_negocio') }}">Mi negocio</a>
+        {% elif rol == 'admin' %}
+          <a href="{{ url_for('admin.panel') }}">Panel admin</a>
+        {% endif %}
+        {% if rol != 'admin' %}
+          {% set pendientes = notificaciones_sin_leer() %}
+          <a href="{{ url_for('notificaciones.listar') }}" class="icono-notif" title="Notificaciones"
+             aria-label="Notificaciones{% if pendientes %} ({{ pendientes }} sin leer){% endif %}">
+            <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.8"
+                 stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/>
+              <path d="M13.73 21a2 2 0 0 1-3.46 0"/>
+            </svg>{% if pendientes %}<span class="globito">{{ pendientes }}</span>{% endif %}
+          </a>
+        {% endif %}
+        <a href="{{ url_for('perfil.ver') }}">Mi perfil</a>
+        <a href="{{ url_for('auth.logout') }}">Cerrar sesión</a>
+      {% else %}
+        <a href="{{ url_for('auth.login') }}">Iniciar sesión</a>
+        <a href="{{ url_for('auth.registro') }}">Registrarme</a>
+      {% endif %}
+    </nav>
+  </header>
+
+  <main class="contenido">
+    {% with mensajes = get_flashed_messages(with_categories=true) %}
+      {% if mensajes %}
+        <div class="mensajes">
+          {% for categoria, mensaje in mensajes %}
+            <p class="mensaje mensaje-{{ categoria }}">{{ mensaje }}</p>
+          {% endfor %}
+        </div>
+      {% endif %}
+    {% endwith %}
+
+    {% block contenido %}{% endblock %}
+  </main>
+
+  <footer class="pie">
+    <p>StyleBook &middot; Sprint 1</p>
+  </footer>
+</body>
+</html>

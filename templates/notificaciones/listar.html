@@ -1,0 +1,25 @@
+{% extends "base.html" %}
+{% block titulo %}Notificaciones · StyleBook{% endblock %}
+{% block contenido %}
+  <h1>Notificaciones</h1>
+
+  {% if notificaciones %}
+    <div class="lista-notificaciones">
+      {% for n in notificaciones %}
+        <div class="notificacion{{ ' notificacion-nueva' if not n.leida }}">
+          <p>{% if not n.leida %}<span class="etiqueta">Nueva</span> {% endif %}{% if n.tipo == 'recordatorio_cita' %}<span class="etiqueta">Recordatorio</span> {% endif %}{{ n.mensaje }}</p>
+          <p class="detalle-menor">{{ n.cuando }}</p>
+        </div>
+      {% endfor %}
+    </div>
+    <p style="margin-top:1.2rem">
+      {% if session.get('rol') == 'cliente' %}
+        <a class="boton boton-secundario" href="{{ url_for('citas.mis_citas') }}">Ir a mis citas</a>
+      {% else %}
+        <a class="boton boton-secundario" href="{{ url_for('citas.agenda') }}">Ir a mi agenda</a>
+      {% endif %}
+    </p>
+  {% else %}
+    <p class="vacio">No tienes notificaciones todavía.</p>
+  {% endif %}
+{% endblock %}
