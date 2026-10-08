@@ -15,6 +15,11 @@
       <p><strong>Estado:</strong>
         <span class="etiqueta">{{ {'pendiente': 'En revisión', 'aprobado': 'Publicado', 'rechazado': 'Rechazado'}[negocio.estado] }}</span>
       </p>
+      {% if negocio.estado == 'aprobado' %}
+        <p><strong>Visibilidad:</strong>
+          <span class="etiqueta {{ 'estado-confirmada' if negocio.get('activo', True) else 'estado-pendiente' }}">{{ "Activo" if negocio.get('activo', True) else "Inactivo" }}</span>
+        </p>
+      {% endif %}
     {% endif %}
 
     <div class="acciones">

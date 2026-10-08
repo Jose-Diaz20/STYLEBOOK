@@ -34,6 +34,28 @@
 
       <button type="submit" class="boton">{{ "Guardar cambios" if editando else "Completar registro" }}</button>
     </form>
+       {% if editando %}
+      {% set esta_activo = negocio.get('activo', True) %}
+      <h2 style="margin-top:1.6rem">Estado de mi negocio</h2>
+      <p>
+        <span class="etiqueta {{ 'estado-confirmada' if esta_activo else 'estado-pendiente' }}">
+          {{ "Activo" if esta_activo else "Inactivo" }}
+        </span>
+      </p>
+      <p class="detalle-menor">
+        {% if esta_activo %}
+          Los clientes pueden verte y reservar contigo.
+        {% else %}
+          No apareces en el listado ni recibes reservas nuevas. Tus citas actuales se conservan.
+        {% endif %}
+      </p>
+      <form method="POST" action="{{ url_for('profesionales.cambiar_activo') }}">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}" />
+        <button type="submit" class="boton boton-secundario">
+          {{ "Marcarme como inactivo" if esta_activo else "Marcarme como activo" }}
+        </button>
+      </form>
+    {% endif %}
     {% if editando %}<p><a href="{{ url_for('perfil.ver') }}">Volver a mi perfil</a></p>{% endif %}
   </section>
 {% endblock %}

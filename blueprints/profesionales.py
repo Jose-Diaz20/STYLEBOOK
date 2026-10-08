@@ -20,16 +20,17 @@ DIAS_VISTA_PREVIA = 7   # días de disponibilidad que se muestran en el perfil
 
 
 def proveedor_aprobado(profesional_id):
-    """Fila del proveedor si existe y está aprobado; si no, None."""
+    """Fila del proveedor si existe, está aprobado por el admin y está activo; si no, None."""
     return primero(sb.table("profesionales").select("*")
-                   .eq("id", profesional_id).eq("estado", "aprobado").limit(1).execute())
+                   .eq("id", profesional_id).eq("estado", "aprobado").eq("activo", True)
+                   .limit(1).execute())
 
 
 @profesionales_bp.route("/profesionales")
 def listar():
     """RF-07: cualquiera puede consultar la lista de proveedores aprobados."""
     respuesta = sb.table("profesionales").select("*").eq(
-        "estado", "aprobado").order("creado_en").execute()
+        "estado", "aprobado").eq("activo", True).order("creado_en").execute()
     return render_template("profesionales/listar.html", profesionales=respuesta.data)
 
 
@@ -150,3 +151,25 @@ def editar_negocio():
 
     flash("Datos del negocio actualizados.", "success")
     return redirect(url_for("perfil.ver"))
+
+@profesionales_bp.route("/mi-negocio/activo", methods=["POST"])
+@exigir_proveedor
+def cambiar_activo():
+    """HU-10: el proveedor se marca activo o inactivo. Inactivo = no recibe reservas nuevas."""
+    sb_usuario = cliente_sesion()
+    negocio = proveedor_propio(sb_usuario)
+    if negocio is None:
+        return redirect(url_for("profesionales.registro"))
+
+    nuevo = not negocio.get("activo", True)
+    try:
+        sb_usuario.table("profesionales").update({"activo": nuevo}).eq(
+            "id", negocio["id"]).execute()
+    except Exception as error:
+        flash(mensaje_error(error), "error")
+        return redirect(url_for("profesionales.editar_negocio"))
+
+    flash("Quedaste activo: los clientes ya pueden reservar contigo." if nuevo
+          else "Quedaste inactivo: ya no apareces para nuevas reservas. "
+               "Tus citas actuales se conservan.", "success")
+    return redirect(url_for("profesionales.editar_negocio"))

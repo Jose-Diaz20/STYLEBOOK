@@ -16,7 +16,7 @@ def catalogo():
     categoria = request.args.get("categoria")
     consulta = sb.table("servicios").select(
         "*, profesionales!inner(id, nombre_negocio, especialidad, ubicacion, estado)"
-    ).eq("activo", True).eq("profesionales.estado", "aprobado")
+        ).eq("activo", True).eq("profesionales.estado", "aprobado").eq("profesionales.activo", True)
 
     if categoria in CATEGORIAS:
         consulta = consulta.eq("categoria", categoria)

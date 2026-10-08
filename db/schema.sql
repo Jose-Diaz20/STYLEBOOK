@@ -681,3 +681,39 @@ begin
   end if;
 end
 $$;
+
+-- ---------- 9. ACTIVO / INACTIVO DEL PROVEEDOR (HU-10) ----------
+-- `estado` lo decide el admin (aprobación); `activo` lo decide el propio proveedor.
+alter table public.profesionales add column if not exists activo boolean not null default true;
+
+-- Un proveedor inactivo no recibe reservas nuevas ni reprogramaciones hacia él.
+-- Sus citas existentes se conservan y se pueden confirmar, completar o cancelar.
+create or replace function public.validar_proveedor_activo()
+returns trigger
+language plpgsql security definer
+set search_path = public
+as $$
+declare
+  v_mueve_horario boolean;
+begin
+  if tg_op = 'INSERT' then
+    v_mueve_horario := true;
+  else
+    v_mueve_horario := new.estado in ('pendiente', 'confirmada')
+      and (new.fecha is distinct from old.fecha
+           or new.hora_inicio is distinct from old.hora_inicio
+           or new.hora_fin is distinct from old.hora_fin);
+  end if;
+
+  if v_mueve_horario and not exists (
+       select 1 from public.profesionales where id = new.profesional_id and activo) then
+    raise exception 'SB: Este proveedor está inactivo por ahora y no recibe reservas nuevas.';
+  end if;
+  return new;
+end;
+$$;
+
+drop trigger if exists validar_proveedor_activo_trg on public.citas;
+create trigger validar_proveedor_activo_trg
+  before insert or update on public.citas
+  for each row execute function public.validar_proveedor_activo();
