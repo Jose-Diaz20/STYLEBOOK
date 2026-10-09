@@ -505,3 +505,98 @@ def test_token_por_vencer_se_renueva_y_se_guarda(cliente_http, db, monkeypatch):
     monkeypatch.setattr(utilidades, "renovar_sesion", lambda rt: (_ for _ in ()).throw(Exception("Already Used")))
     r = cliente_http.get("/mis-citas")
     assert r.status_code == 302 and "/login" in r.headers["Location"]
+
+    
+
+# ---------- HU-10: perfil del proveedor y estado activo/inactivo ----------
+
+def datos_negocio(**cambios):
+    base = {"nombre_negocio": "Barbería Central", "especialidad": "Barbería",
+            "ubicacion": "Cra 5 # 10-20", "telefono": "3001234567",
+            "descripcion": "", "anios_experiencia": "3"}
+    return {**base, **cambios}
+
+
+def test_proveedor_edita_nombre_y_especialidad_y_se_ve_de_inmediato(cliente_http, db):
+    escenario(db)
+    entrar(cliente_http, "local@x.co")
+    r = post(cliente_http, "/mi-negocio",
+             datos_negocio(nombre_negocio="Barbería Nueva Era", especialidad="Colorimetría"))
+    assert r.status_code == 302
+    negocio = db.tablas["profesionales"][0]
+    assert negocio["nombre_negocio"] == "Barbería Nueva Era" and negocio["especialidad"] == "Colorimetría"
+
+    cliente_http.get("/logout")
+    html = cliente_http.get("/profesionales").get_data(as_text=True)
+    assert "Barbería Nueva Era" in html and "Colorimetría" in html
+    assert "Barbería Central" not in html
+
+
+def test_editar_negocio_no_permite_dejar_vacia_la_especialidad(cliente_http, db):
+    escenario(db)
+    entrar(cliente_http, "local@x.co")
+    r = post(cliente_http, "/mi-negocio", datos_negocio(especialidad=""))
+    assert "obligatorios" in r.get_data(as_text=True)
+    assert db.tablas["profesionales"][0]["especialidad"] == "Barbería"
+
+
+def test_proveedor_inactivo_desaparece_para_clientes_y_no_recibe_reservas(cliente_http, db):
+    _, pid, sid = escenario(db)
+    entrar(cliente_http, "local@x.co")
+    perfil = cliente_http.get("/perfil").get_data(as_text=True)
+    assert "Visibilidad" in perfil and "Inactivo" not in perfil
+
+    html = post(cliente_http, "/mi-negocio/activo", follow_redirects=True).get_data(as_text=True)
+    assert db.tablas["profesionales"][0]["activo"] is False
+    assert "Quedaste inactivo" in html and "Marcarme como activo" in html
+    assert "Inactivo" in cliente_http.get("/perfil").get_data(as_text=True)
+    cliente_http.get("/logout")
+
+    # Visitante: no aparece en listado ni catálogo, y su perfil público no existe
+    assert "Barbería Central" not in cliente_http.get("/profesionales").get_data(as_text=True)
+    assert "Corte clásico VIP" not in cliente_http.get("/servicios").get_data(as_text=True)
+    assert cliente_http.get(f"/profesionales/{pid}").status_code == 404
+
+    # Cliente con sesión: no puede reservar ni ve horarios
+    entrar(cliente_http, "ana@x.co")
+    lunes = proximo_dia(0)
+    assert cliente_http.get(f"/profesionales/{pid}/reservar").status_code == 404
+    assert reservar(cliente_http, pid, sid, lunes, "09:00").status_code == 404
+    assert db.tablas["citas"] == []
+    url = f"/profesionales/{pid}/horarios-disponibles?servicio_id={sid}&fecha={lunes}"
+    assert cliente_http.get(url).get_json()["horarios"] == []
+
+
+def test_inactivo_conserva_citas_existentes_y_el_cliente_puede_cancelar(cliente_http, db):
+    _, pid, sid = escenario(db)
+    cid = crear_cita(db, pid, sid, proximo_dia(0), "09:00", "10:00")
+    entrar(cliente_http, "local@x.co")
+    post(cliente_http, "/mi-negocio/activo")
+    assert "Ana" in cliente_http.get("/mi-agenda").get_data(as_text=True)   # su agenda sigue intacta
+    cliente_http.get("/logout")
+
+    entrar(cliente_http, "ana@x.co")
+    assert cliente_http.get("/mis-citas").status_code == 200
+    assert post(cliente_http, f"/mis-citas/{cid}/cancelar").status_code == 302
+    assert db.tablas["citas"][0]["estado"] == "cancelada"
+
+
+def test_reactivar_proveedor_lo_devuelve_al_listado_y_a_las_reservas(cliente_http, db):
+    _, pid, sid = escenario(db)
+    entrar(cliente_http, "local@x.co")
+    post(cliente_http, "/mi-negocio/activo")      # pasa a inactivo
+    post(cliente_http, "/mi-negocio/activo")      # vuelve a activo
+    assert db.tablas["profesionales"][0]["activo"] is True
+    cliente_http.get("/logout")
+
+    assert "Barbería Central" in cliente_http.get("/profesionales").get_data(as_text=True)
+    entrar(cliente_http, "ana@x.co")
+    assert reservar(cliente_http, pid, sid, proximo_dia(0), "09:00").status_code == 302
+
+
+def test_solo_el_proveedor_cambia_su_estado_activo(cliente_http, db):
+    escenario(db)
+    assert post(cliente_http, "/mi-negocio/activo").status_code == 302     # sin sesión → login
+    entrar(cliente_http, "ana@x.co")
+    assert post(cliente_http, "/mi-negocio/activo").status_code == 403     # un cliente no puede
+    assert db.tablas["profesionales"][0]["activo"] is True

@@ -39,6 +39,8 @@ class FakeDB:
         return uid
 
     def insertar(self, tabla, **campos):
+        if tabla == "profesionales":
+            campos.setdefault("activo", True)   # default de la columna (HU-10)
         fila = {"id": str(uuid.uuid4()), **campos}
         self.tablas[tabla].append(_normalizar(fila))
         return fila["id"]
@@ -119,7 +121,7 @@ class Q:
             if self.tabla == "citas": fila.setdefault("estado", "pendiente"); self._cruce(_normalizar(fila))
             if self.tabla == "notificaciones": fila.setdefault("leida", False)
             if self.tabla == "servicios": fila.setdefault("activo", True)
-            if self.tabla == "profesionales": fila["estado"] = "pendiente"   # trigger proteger_profesional
+            if self.tabla == "profesionales": fila["estado"] = "pendiente"; fila.setdefault("activo", True)   # trigger proteger_profesional + default de activo
             tabla.append(_normalizar(fila))
             return Resp([dict(fila)])
         filas = [f for f in tabla if self._coincide(f, simples)]
