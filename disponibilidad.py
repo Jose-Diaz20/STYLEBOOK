@@ -106,7 +106,7 @@ def franjas_por_dia(sb, profesional_id, desde: date, hasta: date, duracion_min: 
     que no expone datos de clientes y no depende de la RLS de `citas`.
     """
     horarios = sb.table("horarios_profesional").select(
-        "dia_semana, hora_inicio, hora_fin"
+        "dia_semana, hora_inicio, hora_fin, pausa_inicio, pausa_fin"
     ).eq("profesional_id", profesional_id).execute().data or []
 
     params = {"p_profesional": profesional_id, "p_desde": desde.isoformat(),
@@ -121,7 +121,25 @@ def franjas_por_dia(sb, profesional_id, desde: date, hasta: date, duracion_min: 
 
     resultado, dia = {}, desde
     while dia <= hasta:
-        bloques = [h for h in horarios if h["dia_semana"] == dia.weekday()]
+        bloques = []
+        for h in horarios:
+            if int(h["dia_semana"]) != dia.weekday():
+                continue
+            inicio = a_time(h["hora_inicio"])
+            fin = a_time(h["hora_fin"])
+            pausa_inicio = h.get("pausa_inicio")
+            pausa_fin = h.get("pausa_fin")
+            # Convertir la jornada en bloques separados. Así ninguna cita puede
+            # comenzar antes del descanso y terminar dentro de él.
+            if pausa_inicio and pausa_fin:
+                p_ini, p_fin = a_time(pausa_inicio), a_time(pausa_fin)
+                if inicio < p_ini < p_fin < fin:
+                    bloques.append({"hora_inicio": inicio, "hora_fin": p_ini})
+                    bloques.append({"hora_inicio": p_fin, "hora_fin": fin})
+                else:
+                    bloques.append({"hora_inicio": inicio, "hora_fin": fin})
+            else:
+                bloques.append({"hora_inicio": inicio, "hora_fin": fin})
         resultado[dia] = generar_franjas_libres(
             dia, bloques, por_fecha.get(dia.isoformat(), []), duracion_min, ahora=ahora
         )
