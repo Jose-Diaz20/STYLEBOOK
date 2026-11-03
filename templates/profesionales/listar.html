@@ -1,6 +1,7 @@
 {% extends "base.html" %}
 {% block titulo %}Profesionales · StyleBook{% endblock %}
 {% block contenido %}
+  {% from "macros.html" import estrellas %}
   <section>
     <h1>Salones, barberías y profesionales</h1>
     {% if profesionales %}
@@ -12,6 +13,9 @@
               <h2>{{ p.nombre_negocio }}</h2>
               <span class="etiqueta">{{ p.especialidad }}</span>
               <span class="etiqueta">{{ "Establecimiento" if p.tipo_proveedor == 'establecimiento' else "Independiente" }}</span>
+              {% if p.total_calificaciones %}
+                <p class="detalle-menor">{{ estrellas(p.calificacion_promedio) }} {{ "%.1f"|format(p.calificacion_promedio) }} ({{ p.total_calificaciones }})</p>
+              {% endif %}
               <p>{{ p.descripcion or "Sin descripción" }}</p>
               {% if p.ubicacion %}<p class="detalle-menor">📍 {{ p.ubicacion }}</p>{% endif %}
             </div>

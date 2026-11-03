@@ -218,3 +218,18 @@ a.tarjeta:hover{border-color:var(--rosa);box-shadow:0 2px 10px #b5654d1a}
 .notificacion p{margin:0}
 .notificacion-nueva{border-color:var(--rosa);background:#fff8f5}
 .hero-sub{font-size:1.25rem;margin-top:.6rem}
+
+/* ---- HU-14 / HU-15: calificaciones y opiniones ---- */
+.estrellas{color:var(--dorado);letter-spacing:.08em;white-space:nowrap}
+.etiqueta-campo{display:block;font-size:.85rem;font-weight:600;margin-bottom:.3rem}
+.estrellas-input{display:inline-flex;flex-direction:row-reverse;gap:.15rem}
+.estrellas-input input{position:absolute;opacity:0;width:1px;height:1px;padding:0;border:0}
+.estrellas-input label{font-size:2.2rem;line-height:1;cursor:pointer;color:#d8cfc9;margin:0}
+.estrellas-input input:checked ~ label,
+.estrellas-input label:hover,
+.estrellas-input label:hover ~ label{color:var(--dorado)}
+.estrellas-input input:focus-visible + label{outline:2px solid var(--rosa);border-radius:4px}
+.lista-opiniones{list-style:none;margin-top:1rem}
+.lista-opiniones li{padding:.8rem 0;border-bottom:1px solid var(--rosa-tenue)}
+.lista-opiniones li:last-child{border-bottom:none}
+.lista-opiniones p{color:var(--tinta-suave);font-size:.92rem;margin-top:.3rem}
