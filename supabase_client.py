@@ -14,7 +14,7 @@ import os
 
 from dotenv import load_dotenv
 from supabase import create_client, Client
-from supabase.lib.client_options import ClientOptions
+from supabase.client import ClientOptions
 
 load_dotenv()
 

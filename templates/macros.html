@@ -1,0 +1,4 @@
+{% macro estrellas(n) -%}
+  {%- set llenas = ((n or 0) + 0.5)|int -%}
+  <span class="estrellas" title="{{ n }} de 5" aria-label="{{ n }} de 5 estrellas">{{ '★' * llenas }}{{ '☆' * (5 - llenas) }}</span>
+{%- endmacro %}

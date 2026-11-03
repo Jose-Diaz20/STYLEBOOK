@@ -2,12 +2,12 @@
 RF-04 Registro de proveedor (establecimiento o profesional independiente)
 RF-07 Consultar proveedor (perfil público: servicios, precios, horarios, ubicación, disponibilidad)
 """
-from datetime import timedelta
+from datetime import datetime, timedelta
 
 from flask import Blueprint, abort, render_template, request, redirect, url_for, session, flash
 
 from supabase_client import sb
-from disponibilidad import ahora_local, franjas_por_dia
+from disponibilidad import ZONA, ahora_local, franjas_por_dia, parsear_fecha
 from utilidades import (
     exigir_proveedor, cliente_sesion, primero, proveedor_propio,
     telefono_valido, mensaje_error,
@@ -25,6 +25,14 @@ def proveedor_aprobado(profesional_id):
                    .eq("id", profesional_id).eq("estado", "aprobado").eq("activo", True)
                    .limit(1).execute())
 
+def _fecha_opinion(texto):
+    """'2026-11-03T15:20:00+00:00' (UTC) → '03/11/2026' en hora de Colombia."""
+    texto = str(texto or "")
+    try:
+        return datetime.fromisoformat(texto.replace("Z", "+00:00")).astimezone(ZONA).strftime("%d/%m/%Y")
+    except ValueError:
+        f = parsear_fecha(texto[:10])
+        return f.strftime("%d/%m/%Y") if f else ""
 
 @profesionales_bp.route("/profesionales")
 def listar():
@@ -61,9 +69,22 @@ def detalle(profesional_id):
         except Exception as error:
             mensaje_error(error)   # queda en el log; la página se muestra sin vista previa
 
+    # HU-15: opiniones públicas, de la más reciente a la más antigua (CA-04)
+    opiniones = []
+    try:
+        opiniones = sb.table("calificaciones").select(
+            "puntuacion, comentario, cliente_nombre, servicio_nombre, creado_en"
+        ).eq("profesional_id", profesional_id).order("creado_en", desc=True).limit(50).execute().data
+        for o in opiniones:
+            o["fecha_txt"] = _fecha_opinion(o["creado_en"])
+    except Exception as error:
+        mensaje_error(error)   # queda en el log; el perfil se muestra sin opiniones
+        opiniones = []
+
     return render_template(
         "profesionales/detalle.html", profesional=profesional, servicios=servicios,
         horarios=horarios, dias=DIAS, disponibilidad=disponibilidad, duracion_ref=duracion_ref,
+        opiniones=opiniones,
     )
 
 

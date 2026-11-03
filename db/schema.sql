@@ -717,3 +717,100 @@ drop trigger if exists validar_proveedor_activo_trg on public.citas;
 create trigger validar_proveedor_activo_trg
   before insert or update on public.citas
   for each row execute function public.validar_proveedor_activo();
+
+  -- ---------- 10. CALIFICACIONES Y OPINIONES (HU-14, HU-15, RN-16) ----------mod bra
+create table if not exists public.calificaciones (
+  id              uuid primary key default gen_random_uuid(),
+  cita_id         uuid not null references public.citas(id) on delete cascade,
+  cliente_id      uuid not null references public.perfiles(id) on delete cascade,
+  profesional_id  uuid not null references public.profesionales(id) on delete cascade,
+  puntuacion      smallint not null check (puntuacion between 1 and 5),
+  comentario      text check (comentario is null or char_length(comentario) <= 1000),
+  cliente_nombre  text,
+  servicio_nombre text,
+  creado_en       timestamptz not null default now(),
+  constraint calificaciones_una_por_cita unique (cita_id)
+);
+create index if not exists idx_calificaciones_profesional
+  on public.calificaciones(profesional_id, creado_en desc);
+
+alter table public.profesionales add column if not exists calificacion_promedio numeric(3,2);
+alter table public.profesionales add column if not exists total_calificaciones integer not null default 0;
+
+create or replace function public.validar_calificacion()
+returns trigger
+language plpgsql security definer
+set search_path = public
+as $$
+declare
+  v_cita     public.citas%rowtype;
+  v_nombre   text;
+  v_servicio text;
+begin
+  select * into v_cita from public.citas where id = new.cita_id;
+  if not found then
+    raise exception 'SB: La cita no existe.';
+  end if;
+  if auth.uid() is not null and auth.uid() <> v_cita.cliente_id then
+    raise exception 'SB: Solo puedes calificar tus propias citas.';
+  end if;
+  if v_cita.estado <> 'completada' then
+    raise exception 'SB: Solo puedes calificar citas completadas.';
+  end if;
+
+  select nombre into v_nombre from public.perfiles where id = v_cita.cliente_id;
+  select nombre into v_servicio from public.servicios where id = v_cita.servicio_id;
+  v_nombre := btrim(coalesce(v_nombre, ''));
+
+  new.cliente_id      := v_cita.cliente_id;
+  new.profesional_id  := v_cita.profesional_id;
+  new.servicio_nombre := v_servicio;
+  new.cliente_nombre  := case
+    when v_nombre = '' then 'Cliente'
+    when position(' ' in v_nombre) = 0 then v_nombre
+    else split_part(v_nombre, ' ', 1) || ' '
+         || upper(left(btrim(substr(v_nombre, position(' ' in v_nombre))), 1)) || '.'
+  end;
+  new.comentario := nullif(btrim(coalesce(new.comentario, '')), '');
+  return new;
+end;
+$$;
+
+drop trigger if exists validar_calificacion_trg on public.calificaciones;
+create trigger validar_calificacion_trg
+  before insert on public.calificaciones
+  for each row execute function public.validar_calificacion();
+
+create or replace function public.actualizar_promedio_proveedor()
+returns trigger
+language plpgsql security definer
+set search_path = public
+as $$
+begin
+  update public.profesionales p set
+    calificacion_promedio = (select round(avg(c.puntuacion)::numeric, 2)
+                               from public.calificaciones c where c.profesional_id = new.profesional_id),
+    total_calificaciones  = (select count(*)
+                               from public.calificaciones c where c.profesional_id = new.profesional_id)
+  where p.id = new.profesional_id;
+  return null;
+end;
+$$;
+
+drop trigger if exists actualizar_promedio_trg on public.calificaciones;
+create trigger actualizar_promedio_trg
+  after insert on public.calificaciones
+  for each row execute function public.actualizar_promedio_proveedor();
+
+alter table public.calificaciones enable row level security;
+drop policy if exists "calificaciones lectura"     on public.calificaciones;
+drop policy if exists "calificaciones alta propia" on public.calificaciones;
+
+create policy "calificaciones lectura" on public.calificaciones
+  for select using (
+    cliente_id = auth.uid()
+    or exists (select 1 from public.profesionales p
+                where p.id = profesional_id and p.estado = 'aprobado')
+  );
+create policy "calificaciones alta propia" on public.calificaciones
+  for insert with check (cliente_id = auth.uid());

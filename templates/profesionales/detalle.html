@@ -1,6 +1,7 @@
 {% extends "base.html" %}
 {% block titulo %}{{ profesional.nombre_negocio }} · StyleBook{% endblock %}
 {% block contenido %}
+  {% from "macros.html" import estrellas %}
   <section>
     <div class="encabezado-profesional">
       <div class="avatar-iniciales avatar-grande">{{ profesional.nombre_negocio[0]|upper }}</div>
@@ -11,6 +12,13 @@
       </div>
     </div>
     <p>{{ profesional.descripcion or "Sin descripción" }}</p>
+    <p class="detalle-menor">
+      {% if profesional.total_calificaciones %}
+        {{ estrellas(profesional.calificacion_promedio) }}
+        <strong>{{ "%.1f"|format(profesional.calificacion_promedio) }}</strong>
+        &middot; {{ profesional.total_calificaciones }} {{ 'opinión' if profesional.total_calificaciones == 1 else 'opiniones' }}
+      {% else %}Aún no tiene opiniones{% endif %}
+    </p>
     <p class="detalle-menor">
       {% if profesional.ubicacion %}📍 {{ profesional.ubicacion }}{% endif %}
       {% if profesional.telefono %} &middot; ☎ {{ profesional.telefono }}{% endif %}
@@ -56,6 +64,23 @@
       {% endfor %}
     {% else %}
       <p>No hay horas libres en los próximos 7 días.</p>
+    {% endif %}
+
+    <h2 style="margin-top:1.6rem">Opiniones de clientes</h2>
+    {% if opiniones %}
+      <ul class="lista-opiniones">
+        {% for o in opiniones %}
+          <li>
+            <div>
+              {{ estrellas(o.puntuacion) }} <strong>{{ o.cliente_nombre or "Cliente" }}</strong>
+              <span class="detalle-menor">&middot; {{ o.fecha_txt }}{% if o.servicio_nombre %} &middot; {{ o.servicio_nombre }}{% endif %}</span>
+            </div>
+            {% if o.comentario %}<p>{{ o.comentario }}</p>{% endif %}
+          </li>
+        {% endfor %}
+      </ul>
+    {% else %}
+      <p>Todavía no hay opiniones.</p>
     {% endif %}
 
     <div style="margin-top:1.6rem">
