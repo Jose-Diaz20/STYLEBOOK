@@ -314,6 +314,87 @@ console.log("\nInstalación limpia");
   await prueba("un servicio con citas no se puede borrar ni siquiera como administrador de BD", async () => {
     await falla(como(db, "sql", "delete from servicios where id=$1", [sid]), "foreign key|violates");
   });
+
+  // ---------- HU-14 (calificar) y HU-15 (consultar opiniones), RN-16 ----------
+  const completada = async (uid, f, ini, fin) => {          // cita ya realizada, creada como SQL Editor
+    await db.exec("reset role");
+    await db.query("alter table citas disable trigger validar_cita_trg");
+    const id = (await db.query(`insert into citas(cliente_id,profesional_id,servicio_id,fecha,hora_inicio,hora_fin,estado)
+      values ($1,$2,$3,$4,$5,$6,'completada') returning id`, [uid, pid, sid, f, ini, fin])).rows[0].id;
+    await db.query("alter table citas enable trigger validar_cita_trg");
+    return id;
+  };
+  const calificar = (uid, citaId, puntos, comentario = null) => como(db, uid,
+    "insert into calificaciones(cita_id,cliente_id,profesional_id,puntuacion,comentario) values ($1,$2,$3,$4,$5) returning *",
+    [citaId, uid, pid, puntos, comentario]);
+  let k1, k2;
+
+  await prueba("HU-14 / RN-16: no se califica una cita que no está completada", async () => {
+    await falla(calificar(u.ana, c1, 5), "citas completadas");                  // c1 sigue pendiente/confirmada
+  });
+
+  await prueba("HU-14: el cliente califica su cita completada; se guardan nombre abreviado y servicio", async () => {
+    k1 = await completada(u.ana, sumar(ayer, -3), "10:00", "11:00");
+    const r = (await calificar(u.ana, k1, 5, "  Excelente atención  ")).rows[0];
+    assert.equal(r.puntuacion, 5);
+    assert.equal(r.comentario, "Excelente atención");                            // se recorta
+    assert.equal(r.servicio_nombre, "Corte");
+    assert.equal(r.cliente_nombre, "Ana M.");                                     // RN-18: nunca el nombre completo
+    assert.equal(r.profesional_id, pid);
+  });
+
+  await prueba("HU-14: una sola calificación por cita", async () => {
+    await falla(calificar(u.ana, k1, 4), "calificaciones_una_por_cita");
+  });
+
+  await prueba("HU-14: nadie califica la cita de otro cliente ni el proveedor la suya", async () => {
+    await falla(calificar(u.beto, k1, 1), "tus propias citas|una por cita|row-level security");
+    const otra = await completada(u.ana, sumar(ayer, -4), "10:00", "11:00");
+    await falla(calificar(u.beto, otra, 1), "tus propias citas|row-level security");
+    await falla(como(db, u.local, "insert into calificaciones(cita_id,cliente_id,profesional_id,puntuacion) values ($1,$2,$3,5)", [otra, u.local, pid]), "row-level security|tus propias citas");
+    await falla(como(db, null, "insert into calificaciones(cita_id,cliente_id,profesional_id,puntuacion) values ($1,$2,$3,5)", [otra, u.ana, pid]), "row-level security|permission denied");
+  });
+
+  await prueba("HU-14: la puntuación debe ser de 1 a 5 y el comentario de hasta 1000 caracteres", async () => {
+    const nueva = await completada(u.ana, sumar(ayer, -5), "10:00", "11:00");
+    await falla(calificar(u.ana, nueva, 0), "puntuacion|check");
+    await falla(calificar(u.ana, nueva, 6), "puntuacion|check");
+    await falla(calificar(u.ana, nueva, 3, "x".repeat(1001)), "comentario|check");
+    assert.equal((await calificar(u.ana, nueva, 3, "x".repeat(1000))).rows.length, 1);   // 1000 sí
+  });
+
+  await prueba("HU-14: la calificación no se puede editar ni borrar desde la app", async () => {
+    await como(db, u.ana, "update calificaciones set puntuacion=1 where cita_id=$1", [k1]);
+    await como(db, u.ana, "delete from calificaciones where cita_id=$1", [k1]);
+    assert.equal((await db.query("select puntuacion from calificaciones where cita_id=$1", [k1])).rows[0].puntuacion, 5);
+  });
+
+  await prueba("HU-15: el promedio y el total del proveedor se recalculan con cada opinión", async () => {
+    const antes = (await db.query("select calificacion_promedio p, total_calificaciones t from profesionales where id=$1", [pid])).rows[0];
+    assert.equal(antes.t, 2);                                                     // 5 (k1) y 3 (la anterior)
+    assert.equal(Number(antes.p), 4);
+    k2 = await completada(u.beto, sumar(ayer, -6), "10:00", "11:00");
+    await calificar(u.beto, k2, 4, "Muy bien");
+    const d = (await db.query("select calificacion_promedio p, total_calificaciones t from profesionales where id=$1", [pid])).rows[0];
+    assert.equal(d.t, 3);
+    assert.equal(Number(d.p), 4);                                                 // (5+3+4)/3
+  });
+
+  await prueba("HU-15: cualquier visitante lee las opiniones de un proveedor aprobado, de la más reciente a la más antigua", async () => {
+    const r = await como(db, null, "select puntuacion, comentario, cliente_nombre, servicio_nombre from calificaciones where profesional_id=$1 order by creado_en desc", [pid]);
+    assert.equal(r.rows.length, 3);
+    assert.ok(r.rows.some((f) => f.comentario === "Muy bien" && f.cliente_nombre === "Beto"));
+  });
+
+  await prueba("HU-15: las opiniones de un proveedor no aprobado no son públicas (el autor sí ve la suya)", async () => {
+    await como(db, u.root, "update profesionales set estado='pendiente' where id=$1", [pid]);   // el admin lo desaprueba
+    try {
+      assert.equal((await como(db, null, "select id from calificaciones")).rows.length, 0);
+      assert.equal((await como(db, u.beto, "select id from calificaciones")).rows.length, 1);   // solo la suya
+    } finally {
+      await como(db, u.root, "update profesionales set estado='aprobado' where id=$1", [pid]);
+    }
+  });
 }
 
 // ===================== MIGRACIÓN DESDE LOS SCRIPTS VIEJOS =====================

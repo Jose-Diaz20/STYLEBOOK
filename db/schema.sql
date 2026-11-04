@@ -724,6 +724,8 @@ create table if not exists public.calificaciones (
   cita_id         uuid not null references public.citas(id) on delete cascade,
   cliente_id      uuid not null references public.perfiles(id) on delete cascade,
   profesional_id  uuid not null references public.profesionales(id) on delete cascade,
+  profesional_id  uuid not null references public.profesionales(id) on delete cascade,
+  servicio_id     uuid references public.servicios(id),
   puntuacion      smallint not null check (puntuacion between 1 and 5),
   comentario      text check (comentario is null or char_length(comentario) <= 1000),
   cliente_nombre  text,
@@ -733,7 +735,10 @@ create table if not exists public.calificaciones (
 );
 create index if not exists idx_calificaciones_profesional
   on public.calificaciones(profesional_id, creado_en desc);
-
+alter table public.calificaciones add column if not exists servicio_id uuid references public.servicios(id);
+update public.calificaciones k set servicio_id = c.servicio_id
+  from public.citas c where k.cita_id = c.id and k.servicio_id is null;
+create index if not exists idx_calificaciones_servicio on public.calificaciones(servicio_id);
 alter table public.profesionales add column if not exists calificacion_promedio numeric(3,2);
 alter table public.profesionales add column if not exists total_calificaciones integer not null default 0;
 
@@ -764,6 +769,10 @@ begin
 
   new.cliente_id      := v_cita.cliente_id;
   new.profesional_id  := v_cita.profesional_id;
+  new.cliente_id      := v_cita.cliente_id;
+  new.profesional_id  := v_cita.profesional_id;
+  new.servicio_id     := v_cita.servicio_id;
+  new.servicio_nombre := v_servicio;
   new.servicio_nombre := v_servicio;
   new.cliente_nombre  := case
     when v_nombre = '' then 'Cliente'

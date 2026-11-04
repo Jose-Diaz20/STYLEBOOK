@@ -2,11 +2,12 @@
 Supabase simulada en memoria para probar los flujos de la app sin red.
 Emula: encadenado de filtros, embeds (tabla(...) y tabla!inner(...)), rpc rangos_ocupados,
 horas en formato 'HH:MM:SS' (como devuelve Postgres) y la restricción sin_cruces_horario.
-NO emula la RLS ni los triggers: eso se prueba con tests/test_sql.js contra Postgres real.
+Emula de los triggers solo lo imprescindible (proteger_profesional, validar_calificacion y el promedio
+de calificaciones); NO emula la RLS: eso se prueba con tests/test_sql.mjs contra Postgres real.
 """
 import re
 import uuid
-from datetime import datetime
+from datetime import datetime, timezone
 
 from postgrest.exceptions import APIError
 
@@ -27,7 +28,8 @@ class Resp:
 class FakeDB:
     def __init__(self):
         self.tablas = {n: [] for n in ("perfiles", "profesionales", "servicios",
-                                       "horarios_profesional", "citas", "notificaciones")}
+                                       "horarios_profesional", "citas", "notificaciones",
+                                       "calificaciones")}
         self.usuarios = []
         self.exigir_confirmacion = False
 
@@ -113,6 +115,43 @@ class Q:
                 raise APIError({"message": 'conflicting key value violates exclusion constraint "sin_cruces_horario"',
                                 "code": "23P01", "details": None, "hint": None})
 
+    def _calificar(self, fila):
+        """Emula validar_calificacion() + actualizar_promedio_proveedor() + las restricciones de la tabla."""
+        def error(msg, codigo="P0001"):
+            return APIError({"message": msg, "code": codigo, "details": None, "hint": None})
+
+        if not isinstance(fila.get("puntuacion"), int) or not 1 <= fila["puntuacion"] <= 5:
+            raise error('new row violates check constraint "calificaciones_puntuacion_check"', "23514")
+        if fila.get("comentario") and len(fila["comentario"]) > 1000:
+            raise error('new row violates check constraint "calificaciones_comentario_check"', "23514")
+        cita = next((c for c in self.db.tablas["citas"] if c["id"] == fila.get("cita_id")), None)
+        if cita is None:
+            raise error("SB: La cita no existe.")
+        if fila.get("cliente_id") != cita["cliente_id"]:
+            raise error("SB: Solo puedes calificar tus propias citas.")
+        if cita["estado"] != "completada":
+            raise error("SB: Solo puedes calificar citas completadas.")
+        if any(k["cita_id"] == cita["id"] for k in self.db.tablas["calificaciones"]):
+            raise error('duplicate key value violates unique constraint "calificaciones_una_por_cita"', "23505")
+
+        perfil = next((p for p in self.db.tablas["perfiles"] if p["id"] == cita["cliente_id"]), {})
+        partes = (perfil.get("nombre") or "").split()
+        fila["cliente_nombre"] = ("Cliente" if not partes else partes[0] if len(partes) == 1
+                                  else f"{partes[0]} {partes[1][0].upper()}.")
+        servicio = next((x for x in self.db.tablas["servicios"] if x["id"] == cita["servicio_id"]), {})
+        fila["servicio_nombre"] = servicio.get("nombre")
+        fila["profesional_id"] = cita["profesional_id"]
+        fila["comentario"] = (fila.get("comentario") or "").strip() or None
+        if fila.get("creado_en") in (None, "now"):
+            fila["creado_en"] = datetime.now(timezone.utc).isoformat()
+        # el promedio se recalcula con la nueva fila incluida (trigger AFTER INSERT)
+        puntos = [k["puntuacion"] for k in self.db.tablas["calificaciones"]
+                  if k["profesional_id"] == fila["profesional_id"]] + [fila["puntuacion"]]
+        for pro in self.db.tablas["profesionales"]:
+            if pro["id"] == fila["profesional_id"]:
+                pro["calificacion_promedio"] = round(sum(puntos) / len(puntos), 2)
+                pro["total_calificaciones"] = len(puntos)
+
     def execute(self):
         tabla = self.db.tablas[self.tabla]
         simples = [f for f in self.filtros if "." not in f[0]]
@@ -122,6 +161,7 @@ class Q:
             if self.tabla == "notificaciones": fila.setdefault("leida", False)
             if self.tabla == "servicios": fila.setdefault("activo", True)
             if self.tabla == "profesionales": fila["estado"] = "pendiente"; fila.setdefault("activo", True)   # trigger proteger_profesional + default de activo
+            if self.tabla == "calificaciones": self._calificar(fila)
             tabla.append(_normalizar(fila))
             return Resp([dict(fila)])
         filas = [f for f in tabla if self._coincide(f, simples)]

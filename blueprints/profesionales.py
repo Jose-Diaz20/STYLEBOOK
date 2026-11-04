@@ -71,10 +71,16 @@ def detalle(profesional_id):
 
     # HU-15: opiniones públicas, de la más reciente a la más antigua (CA-04)
     opiniones = []
+    # ?servicio=<id> muestra solo las opiniones de ese servicio (se ignora si no es de este proveedor)
+    filtro = request.args.get("servicio", "")
+    servicio_filtrado = next((s for s in servicios if str(s["id"]) == filtro), None)
     try:
-        opiniones = sb.table("calificaciones").select(
+        consulta = sb.table("calificaciones").select(
             "puntuacion, comentario, cliente_nombre, servicio_nombre, creado_en"
-        ).eq("profesional_id", profesional_id).order("creado_en", desc=True).limit(50).execute().data
+        ).eq("profesional_id", profesional_id)
+        if servicio_filtrado:
+            consulta = consulta.eq("servicio_id", servicio_filtrado["id"])
+        opiniones = consulta.order("creado_en", desc=True).limit(50).execute().data
         for o in opiniones:
             o["fecha_txt"] = _fecha_opinion(o["creado_en"])
     except Exception as error:
@@ -84,7 +90,7 @@ def detalle(profesional_id):
     return render_template(
         "profesionales/detalle.html", profesional=profesional, servicios=servicios,
         horarios=horarios, dias=DIAS, disponibilidad=disponibilidad, duracion_ref=duracion_ref,
-        opiniones=opiniones,
+        opiniones=opiniones, servicio_filtrado=servicio_filtrado,
     )
 
 
