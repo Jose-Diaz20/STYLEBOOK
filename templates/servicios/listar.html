@@ -1,6 +1,8 @@
+
 {% extends "base.html" %}
 {% block titulo %}Servicios · StyleBook{% endblock %}
 {% block contenido %}
+  {% from "macros.html" import estrellas %}
   <section>
     <h1>Catálogo de servicios</h1>
 
@@ -21,6 +23,17 @@
             <p>{{ s.descripcion or "" }}</p>
             <p class="precio">${{ "%.2f"|format(s.precio) }}</p>
             <p class="detalle-menor">{{ s.duracion_min }} min</p>
+
+            {% if s.total_calificaciones %}
+              <p class="detalle-menor">
+                {{ estrellas(s.calificacion_promedio) }}
+                <strong>{{ "%.1f"|format(s.calificacion_promedio) }}</strong>
+                <span>({{ s.total_calificaciones }} {{ 'opinión' if s.total_calificaciones == 1 else 'opiniones' }})</span>
+              </p>
+            {% else %}
+              <p class="detalle-menor">Sin calificaciones</p>
+            {% endif %}
+
             {% if s.profesionales %}
               <p class="detalle-menor">
                 <a href="{{ url_for('profesionales.detalle', profesional_id=s.profesionales.id) }}">{{ s.profesionales.nombre_negocio }}</a>
@@ -28,8 +41,12 @@
                 {% if s.profesionales.ubicacion %}<br>📍 {{ s.profesionales.ubicacion }}{% endif %}
               </p>
               {% if session.get('rol') == 'cliente' %}
-                <p><a class="boton boton-secundario"
-                      href="{{ url_for('citas.reservar', profesional_id=s.profesionales.id, servicio_id=s.id) }}">Reservar</a></p>
+                <p>
+                  <a class="boton boton-secundario"
+                     href="{{ url_for('citas.reservar', profesional_id=s.profesionales.id, servicio_id=s.id) }}">
+                    Reservar
+                  </a>
+                </p>
               {% endif %}
             {% endif %}
           </div>
@@ -40,3 +57,48 @@
     {% endif %}
   </section>
 {% endblock %}
+
+
+
+create or replace function public.actualizar_promedio_proveedor()
+returns trigger
+language plpgsql security definer
+set search_path = public
+as $$
+begin
+  -- Proveedor
+  update public.profesionales p set
+    calificacion_promedio = (
+      select round(avg(c.puntuacion)::numeric, 2)
+      from public.calificaciones c
+      where c.profesional_id = new.profesional_id
+    ),
+    total_calificaciones = (
+      select count(*)
+      from public.calificaciones c
+      where c.profesional_id = new.profesional_id
+    )
+  where p.id = new.profesional_id;
+
+  -- Servicio
+  update public.servicios s set
+    calificacion_promedio = (
+      select round(avg(c.puntuacion)::numeric, 2)
+      from public.calificaciones c
+      where c.servicio_id = new.servicio_id
+    ),
+    total_calificaciones = (
+      select count(*)
+      from public.calificaciones c
+      where c.servicio_id = new.servicio_id
+    )
+  where s.id = new.servicio_id;
+
+  return new;
+end;
+$$;
+
+drop trigger if exists actualizar_promedio_trg on public.calificaciones;
+create trigger actualizar_promedio_trg
+after insert or update or delete on public.calificaciones
+for each row execute function public.actualizar_promedio_proveedor();
