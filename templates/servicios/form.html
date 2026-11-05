@@ -3,8 +3,53 @@
 {% block contenido %}
   <h1>{{ "Editar servicio" if servicio and servicio.get('id') else "Nuevo servicio" }}</h1>
 
-  <form method="post">
+  <!-- INICIO AGREGADO JESUS: formulario compatible con carga de imágenes. -->
+<form method="post" enctype="multipart/form-data">
+<!-- FIN AGREGADO JESUS: formulario compatible con carga de imágenes. -->
     <input type="hidden" name="csrf_token" value="{{ csrf_token() }}" />
+        <!-- INICIO AGREGADO JESUS: campo obligatorio para la imagen del servicio. -->
+
+    <label for="imagen">
+        Imagen del servicio
+
+        {% if not (servicio and servicio.get('id')) %}
+            <span aria-hidden="true">*</span>
+        {% else %}
+            <small>(Opcional para reemplazar la imagen actual)</small>
+        {% endif %}
+    </label>
+
+    {% if servicio and servicio.get('imagen_url') %}
+
+        <div class="vista-previa-servicio">
+
+            <img
+                src="{{ servicio.imagen_url }}"
+                alt="Imagen actual de {{ servicio.nombre }}"
+            >
+
+            <p>Imagen actual del servicio</p>
+
+        </div>
+
+    {% endif %}
+
+    <input
+        type="file"
+        id="imagen"
+        name="imagen"
+        accept="image/jpeg,image/png,image/webp"
+        {% if not (servicio and servicio.get('id')) %}
+            required
+        {% endif %}
+    >
+
+    <small>
+        Formatos permitidos: JPG, PNG o WEBP.
+        Tamaño máximo: 5 MB.
+    </small>
+
+    <!-- FIN AGREGADO JESUS: campo obligatorio para la imagen del servicio. -->
     <label for="nombre">Nombre del servicio</label>
     <input type="text" id="nombre" name="nombre" required maxlength="100"
            value="{{ servicio.nombre if servicio else '' }}"

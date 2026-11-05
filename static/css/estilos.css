@@ -218,3 +218,51 @@ a.tarjeta:hover{border-color:var(--rosa);box-shadow:0 2px 10px #b5654d1a}
 .notificacion p{margin:0}
 .notificacion-nueva{border-color:var(--rosa);background:#fff8f5}
 .hero-sub{font-size:1.25rem;margin-top:.6rem}
+
+/* INICIO AGREGADO JESUS: estilos para las imágenes de servicios. */
+
+/* Imagen de los servicios en las tarjetas */
+.imagen-servicio-tarjeta {
+    display: block;
+    width: 100%;
+    height: 190px;
+    object-fit: cover;
+    border-radius: 12px;
+    margin: 0 0 .85rem;
+    background: #f3eeee;
+}
+
+/* Contenedor de la imagen actual al editar */
+.vista-previa-servicio {
+    margin: .5rem 0 1rem;
+}
+
+/* Fotografía de vista previa */
+.vista-previa-servicio img {
+    display: block;
+    width: min(100%, 360px);
+    max-height: 220px;
+    object-fit: cover;
+    border-radius: 12px;
+}
+
+/* Texto de imagen actual */
+.vista-previa-servicio p {
+    font-size: .85rem;
+    color: var(--tinta-suave);
+}
+
+/* FIN AGREGADO JESUS: estilos para las imágenes de servicios. */
+
+/* INICIO AGREGADO JESUS: imagen integrada en la tarjeta de servicios. */
+
+.imagen-servicio-tarjeta {
+    width: 100%;
+    height: 190px;
+    object-fit: cover;
+    display: block;
+    border-radius: 10px;
+    margin-bottom: 15px;
+}
+
+/* FIN AGREGADO JESUS: imagen integrada en la tarjeta de servicios. */

@@ -15,6 +15,20 @@
     {% if servicios %}
       <div class="rejilla-tarjetas">
         {% for s in servicios %}
+        <!-- INICIO AGREGADO JESUS: fotografía del servicio en el catálogo público. -->
+
+        {% if s.imagen_url %}
+
+            <img
+                class="imagen-servicio-tarjeta"
+                src="{{ s.imagen_url }}"
+                alt="Imagen de {{ s.nombre }}"
+                loading="lazy"
+            >
+
+        {% endif %}
+
+        <!-- FIN AGREGADO JESUS: fotografía del servicio en el catálogo público. -->
           <div class="tarjeta">
             <span class="etiqueta">{{ s.categoria }}</span>
             <h2>{{ s.nombre }}</h2>

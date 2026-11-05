@@ -1,20 +1,22 @@
+
 """
 Clientes de Supabase.
 
-IMPORTANTE (causa de varios errores del proyecto):
-  · El cliente compartido `sb` es SOLO para lecturas públicas (anónimo). Nunca se usa para
-    iniciar sesión: si se hace, la librería le cambia la cabecera Authorization al token de
-    ese usuario y TODAS las consultas públicas de TODOS los visitantes pasan a ejecutarse
-    como esa persona, hasta que el token vence (~1 h) y entonces todo responde 500.
-  · Ningún cliente refresca tokens por su cuenta (auto_refresh_token=False): Supabase rota el
-    refresh token en cada uso, y un refresco en segundo plano invalida el que guarda la sesión
-    de Flask, lo que termina cerrando la sesión del usuario.
+IMPORTANTE:
+  - El cliente compartido sb es SOLO para lecturas públicas.
+  - No iniciar sesión con el cliente compartido.
+  - Ningún cliente refresca tokens por su cuenta.
 """
+
 import os
 
 from dotenv import load_dotenv
 from supabase import create_client, Client
-from supabase.lib.client_options import ClientOptions
+from supabase.client import ClientOptions
+
+# INICIO AGREGADO JESUS: cliente independiente de Storage.
+from storage3 import SyncStorageClient
+# FIN AGREGADO JESUS: cliente independiente de Storage.
 
 load_dotenv()
 
@@ -29,29 +31,57 @@ if not SUPABASE_URL or not SUPABASE_ANON_KEY:
 
 
 def _opciones() -> ClientOptions:
-    return ClientOptions(auto_refresh_token=False, persist_session=False)
+    return ClientOptions(
+        auto_refresh_token=False,
+        persist_session=False
+    )
 
 
 def cliente_anonimo() -> Client:
-    """Cliente nuevo y aislado (anónimo). Se usa para registro, login y renovar tokens."""
-    return create_client(SUPABASE_URL, SUPABASE_ANON_KEY, options=_opciones())
+    """Cliente nuevo y aislado (anónimo)."""
+    return create_client(
+        SUPABASE_URL,
+        SUPABASE_ANON_KEY,
+        options=_opciones()
+    )
 
 
-# Cliente compartido: solo lecturas públicas. No iniciar sesión con este objeto.
+# Cliente compartido: solo lecturas públicas.
 sb: Client = cliente_anonimo()
 
 
 def sb_como_usuario(access_token: str, refresh_token: str = None) -> Client:
     """
-    Cliente que envía el JWT del usuario a PostgREST, para que las políticas RLS (auth.uid())
-    se apliquen como ese usuario. No hace llamadas de red ni refresca nada: la renovación del
-    token la hace `utilidades.cliente_sesion()` y guarda el resultado en la sesión de Flask.
+    Cliente que envía el JWT del usuario a PostgREST.
+    Las políticas RLS se aplican como ese usuario.
     """
     cliente = cliente_anonimo()
     cliente.postgrest.auth(access_token)
     return cliente
 
 
+# INICIO AGREGADO JESUS: cliente Storage autenticado con el JWT del profesional.
+
+def storage_como_usuario(access_token: str):
+    """
+    Crea un cliente independiente de Storage autenticado
+    con el JWT del profesional.
+    """
+
+    if not access_token:
+        raise ValueError("No se recibió el token de autenticación.")
+
+    return SyncStorageClient(
+        f"{SUPABASE_URL.rstrip('/')}/storage/v1",
+        {
+            "apiKey": SUPABASE_ANON_KEY,
+            "Authorization": f"Bearer {access_token}"
+        }
+    )
+
+# FIN AGREGADO JESUS: cliente Storage autenticado con el JWT del profesional.
+
+
 def renovar_sesion(refresh_token: str):
-    """Canjea un refresh token por una sesión nueva (access + refresh)."""
+    """Canjea un refresh token por una sesión nueva."""
     return cliente_anonimo().auth.refresh_session(refresh_token)
