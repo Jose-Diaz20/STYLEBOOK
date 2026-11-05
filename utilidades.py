@@ -171,6 +171,10 @@ def mensaje_error(error, generico="No se pudo completar la operación. Inténtal
         return texto.split("SB: ", 1)[1].strip().strip("'\"}").rstrip()
     if codigo == "23P01" or "sin_cruces_horario" in bajo:
         return "Ese horario acaba de ser ocupado por otra reserva. Elige otro."
+    
+    if "calificaciones_una_por_cita" in bajo:
+        return "Ya calificaste esta cita."
+        
     if codigo == "23505" or "already registered" in bajo or "already been registered" in bajo:
         return "Ya existe un registro con esos datos."
     if codigo == "42501" or "row-level security" in bajo:

@@ -600,3 +600,174 @@ def test_solo_el_proveedor_cambia_su_estado_activo(cliente_http, db):
     entrar(cliente_http, "ana@x.co")
     assert post(cliente_http, "/mi-negocio/activo").status_code == 403     # un cliente no puede
     assert db.tablas["profesionales"][0]["activo"] is True
+
+
+# ---------- HU-14 Calificar el servicio · HU-15 Consultar opiniones (RN-16) ----------
+
+def cita_pasada_completada(db, pid, sid, cliente="ana@x.co", dias=3, ini="09:00", fin="10:00"):
+    return crear_cita(db, pid, sid, date.today() - timedelta(days=dias), ini, fin,
+                      estado="completada", cliente=cliente)
+
+
+def calificar_via_web(c, cita_id, puntuacion="5", comentario="", **kw):
+    return post(c, f"/mis-citas/{cita_id}/calificar", {"puntuacion": puntuacion, "comentario": comentario}, **kw)
+
+
+def test_hu14_cliente_califica_su_cita_completada_y_ya_no_se_le_ofrece_de_nuevo(cliente_http, db):
+    _, pid, sid = escenario(db)
+    cid = cita_pasada_completada(db, pid, sid)
+    entrar(cliente_http, "ana@x.co")
+
+    assert "Calificar servicio" in cliente_http.get("/mis-citas").get_data(as_text=True)
+    formulario = cliente_http.get(f"/mis-citas/{cid}/calificar")
+    assert formulario.status_code == 200 and 'name="puntuacion"' in formulario.get_data(as_text=True)
+
+    r = calificar_via_web(cliente_http, cid, "4", "  Muy buena atención  ", follow_redirects=True)
+    assert "opinión quedó publicada" in r.get_data(as_text=True)
+
+    (fila,) = db.tablas["calificaciones"]
+    assert (fila["cita_id"], fila["puntuacion"], fila["comentario"]) == (cid, 4, "Muy buena atención")
+    assert fila["servicio_nombre"] == "Corte clásico VIP" and fila["cliente_nombre"] == "Ana"
+    assert fila["profesional_id"] == pid
+
+    html = cliente_http.get("/mis-citas").get_data(as_text=True)
+    assert "Tu calificación" in html and "Calificar servicio" not in html
+
+
+def test_hu14_el_comentario_es_opcional(cliente_http, db):
+    _, pid, sid = escenario(db)
+    cid = cita_pasada_completada(db, pid, sid)
+    entrar(cliente_http, "ana@x.co")
+    calificar_via_web(cliente_http, cid, "5", "")
+    assert db.tablas["calificaciones"][0]["comentario"] is None
+
+
+def test_hu14_ca01_no_se_califica_una_cita_que_no_esta_completada(cliente_http, db):
+    _, pid, sid = escenario(db)
+    futura = crear_cita(db, pid, sid, proximo_dia(0), "09:00", "10:00", estado="confirmada")
+    cancelada = cita_pasada_completada(db, pid, sid, dias=5)
+    next(c for c in db.tablas["citas"] if c["id"] == cancelada)["estado"] = "cancelada"
+    entrar(cliente_http, "ana@x.co")
+
+    for cid in (futura, cancelada):
+        r = cliente_http.get(f"/mis-citas/{cid}/calificar", follow_redirects=True)
+        assert "Solo puedes calificar citas completadas" in r.get_data(as_text=True)
+        calificar_via_web(cliente_http, cid, "5")
+    assert db.tablas["calificaciones"] == []
+    assert "Calificar servicio" not in cliente_http.get("/mis-citas").get_data(as_text=True)
+
+
+def test_hu14_ca02_valida_puntuacion_de_1_a_5_y_largo_del_comentario(cliente_http, db):
+    _, pid, sid = escenario(db)
+    cid = cita_pasada_completada(db, pid, sid)
+    entrar(cliente_http, "ana@x.co")
+
+    for mala in ("", "0", "6", "abc", "-1", "4.5"):
+        r = calificar_via_web(cliente_http, cid, mala, "texto")
+        assert r.status_code == 200 and "Elige una puntuación de 1 a 5" in r.get_data(as_text=True), mala
+        assert "texto" in r.get_data(as_text=True)                    # no pierde lo que escribió
+    r = calificar_via_web(cliente_http, cid, "5", "x" * 1001)
+    assert "no puede superar 1000 caracteres" in r.get_data(as_text=True)
+    assert db.tablas["calificaciones"] == []
+
+    calificar_via_web(cliente_http, cid, "5", "x" * 1000)             # el límite exacto sí se acepta
+    assert len(db.tablas["calificaciones"]) == 1
+
+
+def test_hu14_ca03_una_sola_calificacion_por_cita(cliente_http, db):
+    _, pid, sid = escenario(db)
+    cid = cita_pasada_completada(db, pid, sid)
+    entrar(cliente_http, "ana@x.co")
+    calificar_via_web(cliente_http, cid, "5", "Genial")
+
+    for r in (cliente_http.get(f"/mis-citas/{cid}/calificar", follow_redirects=True),
+              calificar_via_web(cliente_http, cid, "1", "Cambio de opinión", follow_redirects=True)):
+        assert "Ya calificaste esta cita" in r.get_data(as_text=True)
+    (fila,) = db.tablas["calificaciones"]
+    assert fila["puntuacion"] == 5 and fila["comentario"] == "Genial"
+
+
+def test_hu14_solo_el_dueno_de_la_cita_puede_calificarla(cliente_http, db):
+    _, pid, sid = escenario(db)
+    db.agregar_usuario("beto@x.co", "secreto1", "Beto", "cliente")
+    de_ana = cita_pasada_completada(db, pid, sid, cliente="ana@x.co")
+
+    entrar(cliente_http, "beto@x.co")
+    assert cliente_http.get(f"/mis-citas/{de_ana}/calificar").status_code == 404
+    assert calificar_via_web(cliente_http, de_ana, "1", "Spam").status_code == 404
+    cliente_http.get("/logout")
+
+    entrar(cliente_http, "local@x.co")                                 # el proveedor tampoco se califica a sí mismo
+    assert cliente_http.get(f"/mis-citas/{de_ana}/calificar").status_code in (302, 403)
+    assert calificar_via_web(cliente_http, de_ana, "5").status_code in (302, 403)
+    cliente_http.get("/logout")
+
+    assert cliente_http.get(f"/mis-citas/{de_ana}/calificar").status_code in (302, 401, 403)   # sin sesión
+    assert db.tablas["calificaciones"] == []
+
+
+def test_hu15_las_opiniones_son_publicas_recientes_primero_y_con_promedio(cliente_http, db):
+    _, pid, sid = escenario(db)
+    db.agregar_usuario("beto@x.co", "secreto1", "Beto Gómez", "cliente")
+    c1 = cita_pasada_completada(db, pid, sid, cliente="ana@x.co", dias=6)
+    c2 = cita_pasada_completada(db, pid, sid, cliente="beto@x.co", dias=2)
+
+    entrar(cliente_http, "ana@x.co")
+    calificar_via_web(cliente_http, c1, "5", "Primera opinión")
+    cliente_http.get("/logout")
+    entrar(cliente_http, "beto@x.co")
+    calificar_via_web(cliente_http, c2, "3", "Segunda opinión")
+    cliente_http.get("/logout")
+    # la más reciente es la de Beto: se fija la fecha para no depender del reloj
+    for k in db.tablas["calificaciones"]:
+        k["creado_en"] = "2026-11-02T12:00:00+00:00" if k["comentario"] == "Primera opinión" else "2026-11-03T12:00:00+00:00"
+
+    html = cliente_http.get(f"/profesionales/{pid}").get_data(as_text=True)     # visitante sin sesión
+    assert "Opiniones de clientes" in html
+    assert "Primera opinión" in html and "Segunda opinión" in html
+    assert html.index("Segunda opinión") < html.index("Primera opinión")          # CA-04: de la más reciente a la más antigua
+    assert "Beto G." in html and "Gómez" not in html                              # RN-18: nombre abreviado
+    assert "Corte clásico VIP" in html and "03/11/2026" in html
+    assert "<strong>4.0</strong>" in html and "2 opiniones" in html                # promedio (5+3)/2
+
+    assert "(2)" in cliente_http.get("/profesionales").get_data(as_text=True)    # también en el listado
+
+
+def test_hu15_proveedor_sin_opiniones_lo_indica(cliente_http, db):
+    _, pid, _ = escenario(db)
+    html = cliente_http.get(f"/profesionales/{pid}").get_data(as_text=True)
+    assert "Todavía no hay opiniones" in html and "Aún no tiene opiniones" in html
+
+
+def test_hu15_el_comentario_se_muestra_escapado(cliente_http, db):
+    _, pid, sid = escenario(db)
+    cid = cita_pasada_completada(db, pid, sid)
+    entrar(cliente_http, "ana@x.co")
+    calificar_via_web(cliente_http, cid, "5", "<script>alert(1)</script>")
+    cliente_http.get("/logout")
+    html = cliente_http.get(f"/profesionales/{pid}").get_data(as_text=True)
+    assert "<script>alert(1)</script>" not in html and "&lt;script&gt;" in html
+
+
+def test_hu15_si_falla_la_lectura_de_opiniones_el_perfil_sigue_abriendo(cliente_http, db, monkeypatch):
+    _, pid, _ = escenario(db)
+    original = db.tablas.pop("calificaciones")          # la consulta de opiniones lanzará KeyError
+    try:
+        r = cliente_http.get(f"/profesionales/{pid}")
+    finally:
+        db.tablas["calificaciones"] = original
+    assert r.status_code == 200 and "Todavía no hay opiniones" in r.get_data(as_text=True)
+
+def test_hu15_el_catalogo_de_servicios_muestra_estrellas_y_enlace_a_las_opiniones(cliente_http, db):
+    _, pid, sid = escenario(db)
+    assert "Aún sin opiniones" in cliente_http.get("/servicios").get_data(as_text=True)
+
+    cid = cita_pasada_completada(db, pid, sid)
+    entrar(cliente_http, "ana@x.co")
+    calificar_via_web(cliente_http, cid, "4", "Muy bien")
+    cliente_http.get("/logout")
+
+    html = cliente_http.get("/servicios").get_data(as_text=True)
+    assert "Aún sin opiniones" not in html
+    assert "4.0" in html and "1 opinión" in html
+    assert f"/profesionales/{pid}#opiniones" in html

@@ -175,8 +175,31 @@ def catalogo():
         categoria = None
 
     respuesta = consulta.order("creado_en", desc=True).execute()
-    return render_template("servicios/listar.html", servicios=respuesta.data,
+    servicios = respuesta.data
+    _agregar_calificaciones(servicios)
+    return render_template("servicios/listar.html", servicios=servicios,
                            categoria=categoria, categorias=CATEGORIAS)
+
+
+def _agregar_calificaciones(servicios):
+    """HU-15: cada servicio muestra solo las opiniones de las citas de ESE servicio
+    (no las del proveedor en general). Agrega 'total_calificaciones' y 'calificacion_promedio'."""
+    suma, total = {}, {}
+    ids = [s["id"] for s in servicios]
+    try:
+        for i in range(0, len(ids), 50):      # por lotes: evita URLs demasiado largas
+            filas = sb.table("calificaciones").select("servicio_id, puntuacion").in_(
+                "servicio_id", ids[i:i + 50]).execute().data
+            for f in filas:
+                total[f["servicio_id"]] = total.get(f["servicio_id"], 0) + 1
+                suma[f["servicio_id"]] = suma.get(f["servicio_id"], 0) + f["puntuacion"]
+    except Exception as error:
+        mensaje_error(error)                  # queda en el log; el catálogo se muestra sin estrellas
+        suma, total = {}, {}
+    for s in servicios:
+        n = total.get(s["id"], 0)
+        s["total_calificaciones"] = n
+        s["calificacion_promedio"] = round(suma[s["id"]] / n, 2) if n else None
 
 
 def _negocio_o_redirigir(sb_usuario):

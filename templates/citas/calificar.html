@@ -1,0 +1,34 @@
+{% extends "base.html" %}
+{% block titulo %}Calificar servicio · StyleBook{% endblock %}
+{% block contenido %}
+  <h1>Calificar servicio</h1>
+  <p class="detalle-menor">
+    {{ cita.servicios.nombre if cita.servicios else "Servicio" }}
+    {% if cita.profesionales %}con {{ cita.profesionales.nombre_negocio }}{% endif %}<br>
+    {{ cita.fecha_txt }} &middot; {{ cita.hora_txt }}
+  </p>
+
+  <form method="post" action="{{ url_for('citas.calificar', cita_id=cita.id) }}">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}" />
+
+    <div>
+      <span class="etiqueta-campo">¿Cómo fue tu experiencia?</span>
+      <div class="estrellas-input" role="radiogroup" aria-label="Puntuación de 1 a 5">
+        {% for n in [5, 4, 3, 2, 1] %}
+          <input type="radio" id="estrella{{ n }}" name="puntuacion" value="{{ n }}"
+                 {{ 'checked' if puntuacion == n|string }} />
+          <label for="estrella{{ n }}" title="{{ n }} de 5">★</label>
+        {% endfor %}
+      </div>
+    </div>
+
+    <label for="comentario">Comentario (opcional)</label>
+    <textarea id="comentario" name="comentario" maxlength="1000"
+              placeholder="Cuéntanos cómo te atendieron…">{{ comentario }}</textarea>
+
+    <div class="acciones">
+      <button type="submit" class="boton">Publicar opinión</button>
+      <a class="boton boton-secundario" href="{{ url_for('citas.mis_citas') }}">Cancelar</a>
+    </div>
+  </form>
+{% endblock %}

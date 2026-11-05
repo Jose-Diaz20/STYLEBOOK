@@ -168,8 +168,16 @@ def mis_citas():
     filas = sb_usuario.table("citas").select(
         "*, profesionales(id, nombre_negocio, especialidad, ubicacion), servicios(nombre, precio)"
     ).eq("cliente_id", session["user_id"]).execute().data
+
     ahora = ahora_local()
-    proximas, historial = _separar([_preparar(c, ahora) for c in filas])
+    citas = [_preparar(c, ahora) for c in filas]
+    # HU-14: puntuación que ya dio el cliente a cada cita (para no ofrecer calificar dos veces)
+    dadas = {r["cita_id"]: r["puntuacion"] for r in sb_usuario.table("calificaciones").select(
+        "cita_id, puntuacion").eq("cliente_id", session["user_id"]).execute().data}
+    for c in citas:
+        c["mi_puntuacion"] = dadas.get(c["id"])
+    proximas, historial = _separar(citas)
+
     return render_template("citas/listar.html", proximas=proximas, historial=historial)
 
 
@@ -261,6 +269,58 @@ def reprogramar(cita_id):
     flash("Cita reprogramada correctamente.", "success")
     return redirect(url_for("citas.mis_citas"))
 
+# ---------- Calificar el servicio recibido (HU-14, RN-16) ----------
+
+@citas_bp.route("/mis-citas/<cita_id>/calificar", methods=["GET", "POST"])
+@exigir_cliente
+def calificar(cita_id):
+    """CA-01: solo citas completadas. CA-02: 1 a 5 estrellas + comentario opcional.
+    CA-03: una sola calificación por cita (la base de datos también lo impide)."""
+    sb_usuario = cliente_sesion()
+    cita = _cita_propia(sb_usuario, cita_id)
+    if cita is None:
+        abort(404)
+    _preparar(cita, ahora_local())
+
+    if cita["estado"] != "completada":
+        flash("Solo puedes calificar citas completadas.", "error")
+        return redirect(url_for("citas.mis_citas"))
+
+    ya = primero(sb_usuario.table("calificaciones").select("id").eq(
+        "cita_id", cita_id).limit(1).execute())
+    if ya is not None:
+        flash("Ya calificaste esta cita. ¡Gracias por tu opinión!", "error")
+        return redirect(url_for("citas.mis_citas"))
+
+    if request.method == "GET":
+        return render_template("citas/calificar.html", cita=cita, puntuacion="", comentario="")
+
+    puntuacion = request.form.get("puntuacion", "")
+    comentario = request.form.get("comentario", "").strip()
+
+    def volver(mensaje):
+        flash(mensaje, "error")
+        return render_template("citas/calificar.html", cita=cita,
+                               puntuacion=puntuacion, comentario=comentario)
+
+    if puntuacion not in ("1", "2", "3", "4", "5"):
+        return volver("Elige una puntuación de 1 a 5 estrellas.")
+    if len(comentario) > 1000:
+        return volver("El comentario no puede superar 1000 caracteres.")
+
+    try:
+        sb_usuario.table("calificaciones").insert({
+            "cita_id": cita_id,
+            "cliente_id": session["user_id"],
+            "profesional_id": cita["profesional_id"],
+            "puntuacion": int(puntuacion),
+            "comentario": comentario or None,
+        }).execute()
+    except Exception as error:
+        return volver(mensaje_error(error, "No se pudo guardar tu calificación."))
+
+    flash("¡Gracias! Tu opinión quedó publicada.", "success")
+    return redirect(url_for("citas.mis_citas"))
 
 # ---------- Agenda del proveedor: confirmar, completar, cancelar (RN-13) ----------
 

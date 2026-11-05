@@ -1,6 +1,7 @@
 {% extends "base.html" %}
 {% block titulo %}Servicios · StyleBook{% endblock %}
 {% block contenido %}
+  {% from "macros.html" import estrellas %}
   <section>
     <h1>Catálogo de servicios</h1>
 
@@ -40,6 +41,13 @@
                 <a href="{{ url_for('profesionales.detalle', profesional_id=s.profesionales.id) }}">{{ s.profesionales.nombre_negocio }}</a>
                 &middot; {{ s.profesionales.especialidad }}
                 {% if s.profesionales.ubicacion %}<br>📍 {{ s.profesionales.ubicacion }}{% endif %}
+              </p>
+              <p class="detalle-menor">
+                {% if s.total_calificaciones %}
+                  {{ estrellas(s.calificacion_promedio) }}
+                  {{ "%.1f"|format(s.calificacion_promedio) }}
+                  &middot; <a href="{{ url_for('profesionales.detalle', profesional_id=s.profesionales.id, servicio=s.id) }}#opiniones">{{ s.total_calificaciones }} {{ 'opinión' if s.total_calificaciones == 1 else 'opiniones' }}</a>
+                {% else %}Aún sin opiniones{% endif %}
               </p>
               {% if session.get('rol') == 'cliente' %}
                 <p><a class="boton boton-secundario"
