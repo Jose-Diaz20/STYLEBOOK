@@ -1,7 +1,9 @@
+
 {% extends "base.html" %}
 {% block titulo %}Servicios · StyleBook{% endblock %}
 {% block contenido %}
   {% from "macros.html" import estrellas %}
+
   <section>
     <h1>Catálogo de servicios</h1>
 
@@ -16,49 +18,74 @@
     {% if servicios %}
       <div class="rejilla-tarjetas">
         {% for s in servicios %}
-        <!-- INICIO AGREGADO JESUS: fotografía del servicio en el catálogo público. -->
 
-        {% if s.imagen_url %}
-
-            <img
-                class="imagen-servicio-tarjeta"
-                src="{{ s.imagen_url }}"
-                alt="Imagen de {{ s.nombre }}"
-                loading="lazy"
-            >
-
-        {% endif %}
-
-        <!-- FIN AGREGADO JESUS: fotografía del servicio en el catálogo público. -->
           <div class="tarjeta">
+
+            <!-- INICIO AGREGADO JESUS: imagen dentro de la tarjeta del catálogo público. -->
+
+            {% if s.imagen_url %}
+              <img
+                  class="imagen-servicio-tarjeta"
+                  src="{{ s.imagen_url }}"
+                  alt="Imagen de {{ s.nombre }}"
+                  loading="lazy"
+              >
+            {% endif %}
+
+            <!-- FIN AGREGADO JESUS: imagen dentro de la tarjeta del catálogo público. -->
+
             <span class="etiqueta">{{ s.categoria }}</span>
+
             <h2>{{ s.nombre }}</h2>
+
             <p>{{ s.descripcion or "" }}</p>
+
             <p class="precio">${{ "%.2f"|format(s.precio) }}</p>
+
             <p class="detalle-menor">{{ s.duracion_min }} min</p>
+
             {% if s.profesionales %}
               <p class="detalle-menor">
                 <a href="{{ url_for('profesionales.detalle', profesional_id=s.profesionales.id) }}">{{ s.profesionales.nombre_negocio }}</a>
                 &middot; {{ s.profesionales.especialidad }}
-                {% if s.profesionales.ubicacion %}<br>📍 {{ s.profesionales.ubicacion }}{% endif %}
+
+                {% if s.profesionales.ubicacion %}
+                  <br>📍 {{ s.profesionales.ubicacion }}
+                {% endif %}
               </p>
+
               <p class="detalle-menor">
                 {% if s.total_calificaciones %}
                   {{ estrellas(s.calificacion_promedio) }}
                   {{ "%.1f"|format(s.calificacion_promedio) }}
-                  &middot; <a href="{{ url_for('profesionales.detalle', profesional_id=s.profesionales.id, servicio=s.id) }}#opiniones">{{ s.total_calificaciones }} {{ 'opinión' if s.total_calificaciones == 1 else 'opiniones' }}</a>
-                {% else %}Aún sin opiniones{% endif %}
+                  &middot;
+                  <a href="{{ url_for('profesionales.detalle', profesional_id=s.profesionales.id, servicio=s.id) }}#opiniones">
+                    {{ s.total_calificaciones }} {{ 'opinión' if s.total_calificaciones == 1 else 'opiniones' }}
+                  </a>
+                {% else %}
+                  Aún sin opiniones
+                {% endif %}
               </p>
+
               {% if session.get('rol') == 'cliente' %}
-                <p><a class="boton boton-secundario"
-                      href="{{ url_for('citas.reservar', profesional_id=s.profesionales.id, servicio_id=s.id) }}">Reservar</a></p>
+                <p>
+                  <a class="boton boton-secundario"
+                     href="{{ url_for('citas.reservar', profesional_id=s.profesionales.id, servicio_id=s.id) }}">
+                    Reservar
+                  </a>
+                </p>
               {% endif %}
             {% endif %}
+
           </div>
+
         {% endfor %}
       </div>
+
     {% else %}
-      <p class="vacio">Todavía no hay servicios cargados{{ ' en esta categoría' if categoria else '' }}.</p>
+      <p class="vacio">
+        Todavía no hay servicios cargados{{ ' en esta categoría' if categoria else '' }}.
+      </p>
     {% endif %}
   </section>
 {% endblock %}
