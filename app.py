@@ -8,6 +8,12 @@ from dotenv import load_dotenv
 from flask import Flask, abort, flash, redirect, render_template, request, session, url_for
 from werkzeug.exceptions import Forbidden, NotFound
 
+from flask import Flask, abort, flash, redirect, render_template, request, session, url_for
+# INICIO AGREGADO JESUS: importar Supabase y datos del catálogo para la portada.
+from supabase_client import sb
+from blueprints.servicios import _agregar_calificaciones
+# FIN AGREGADO JESUS: importar Supabase y datos del catálogo para la portada.
+
 load_dotenv()
 
 from blueprints.auth import auth_bp
@@ -111,9 +117,43 @@ def _error_servidor(error):
                            mensaje="Algo salió mal de nuestro lado. Inténtalo de nuevo en un momento."), 500
 
 
+
+# INICIO AGREGADO JESUS: cargar servicios reales en la página principal.
 @app.route("/")
 def index():
-    return render_template("index.html")
+    servicios_inicio = []
+
+    try:
+        respuesta = (
+            sb.table("servicios")
+            .select(
+                "*, profesionales!inner("
+                "id, nombre_negocio, especialidad, ubicacion, estado"
+                ")"
+            )
+            .eq("activo", True)
+            .eq("profesionales.estado", "aprobado")
+            .eq("profesionales.activo", True)
+            .order("creado_en", desc=True)
+            .limit(4)
+            .execute()
+        )
+
+        servicios_inicio = respuesta.data or []
+
+        # Agregar las calificaciones reales de cada servicio.
+        _agregar_calificaciones(servicios_inicio)
+
+    except Exception:
+        logging.exception(
+            "No se pudieron cargar los servicios de la página principal."
+        )
+
+    return render_template(
+        "index.html",
+        servicios=servicios_inicio
+    )
+# FIN AGREGADO JESUS: cargar servicios reales en la página principal.
 
 
 if __name__ == "__main__":

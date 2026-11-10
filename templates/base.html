@@ -9,10 +9,20 @@
   <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@700;800&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="{{ url_for('static', filename='css/estilos.css') }}" />
 </head>
-<body>
+<!-- INICIO AGREGADO JESUS: identificar la página principal. -->
+<body class="{% if request.endpoint == 'index' %}pagina-inicio{% endif %}">
+<!-- FIN AGREGADO JESUS: identificar la página principal. -->
   {% set rol = session.get('rol') %}
   <header class="barra">
-    <a href="{{ url_for('index') }}" class="marca">StyleBook</a>
+    
+      
+    <!-- INICIO AGREGADO JESUS: logo StyleBook. -->
+    <a href="{{ url_for('index') }}" class="marca logo-stylebook">
+        <span class="logo-stylebook-imagen" role="img" aria-label="StyleBook"></span>
+    </a>
+    <!-- FIN AGREGADO JESUS: logo StyleBook. -->
+
+
     <nav class="menu">
       {# Menú según el tipo de cuenta: el catálogo es de clientes y visitantes; el proveedor ve solo su panel #}
       {% set es_proveedor = rol in ['establecimiento', 'profesional'] %}
