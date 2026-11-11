@@ -1,21 +1,202 @@
+
 {% extends "base.html" %}
+{% from "macros.html" import estrellas %}
+
 {% block titulo %}Mis citas · StyleBook{% endblock %}
+
 {% block contenido %}
-  <h1>Mis citas</h1>
 
-  <h2 style="margin-top:1.2rem">Próximas</h2>
-  {% if proximas %}
-    <div class="rejilla">
-      {% for c in proximas %}{% with modo='cliente' %}{% include "citas/_tarjeta_cita.html" %}{% endwith %}{% endfor %}
-    </div>
-  {% else %}
-    <p class="vacio">No tienes citas próximas. <a href="{{ url_for('profesionales.listar') }}">Reserva una</a>.</p>
-  {% endif %}
+<!-- INICIO AGREGADO JESUS: rediseño de Mis citas para clientes -->
+<section class="mis-citas-pagina">
 
-  {% if historial %}
-    <h2 style="margin-top:2rem">Historial</h2>
-    <div class="rejilla">
-      {% for c in historial %}{% with modo='cliente' %}{% include "citas/_tarjeta_cita.html" %}{% endwith %}{% endfor %}
+    <header class="mis-citas-hero">
+        <div>
+            <span class="mis-citas-eyebrow">STYLEBOOK · MI ESPACIO</span>
+            <h1>Mis citas</h1>
+            <p>Organiza tus reservas y disfruta de cada momento dedicado a ti.</p>
+        </div>
+        <div class="mis-citas-hero-decoracion" aria-hidden="true">♡</div>
+    </header>
+
+    <div class="mis-citas-resumen">
+        <div class="mis-citas-resumen-icono">▣</div>
+        <div>
+            <strong>{{ proximas|length }}</strong>
+            <span>{{ 'próxima cita' if proximas|length == 1 else 'próximas citas' }}</span>
+        </div>
+        <a href="{{ url_for('profesionales.listar') }}"
+           class="mis-citas-nueva">
+            Explorar profesionales <span aria-hidden="true">→</span>
+        </a>
     </div>
-  {% endif %}
+
+    <section class="mis-citas-seccion">
+        <div class="mis-citas-titulo-seccion">
+            <div>
+                <span class="mis-citas-etiqueta-seccion">TUS RESERVAS</span>
+                <h2>Próximas citas</h2>
+                <p>Estas son las citas que tienes programadas.</p>
+            </div>
+            <span class="mis-citas-contador">{{ proximas|length }}</span>
+        </div>
+
+        {% if proximas %}
+        <div class="mis-citas-grid">
+
+            {% for c in proximas %}
+            <article class="mis-cita-card">
+
+                <div class="mis-cita-card-cabecera">
+                    <span class="mis-cita-icono">♡</span>
+                    <span class="etiqueta estado-{{ c.estado }}">
+                        {{ c.estado_txt }}
+                    </span>
+                </div>
+
+                <div class="mis-cita-servicio">
+                    <span class="mis-cita-mini-titulo">SERVICIO RESERVADO</span>
+                    <h3>{{ c.servicios.nombre if c.servicios else "Servicio" }}</h3>
+                </div>
+
+                <div class="mis-cita-profesional">
+                    <span class="mis-cita-icono-dato">♙</span>
+                    <div>
+                        <small>Profesional</small>
+                        {% if c.profesionales %}
+                            <a href="{{ url_for('profesionales.detalle', profesional_id=c.profesionales.id) }}">
+                                {{ c.profesionales.nombre_negocio }}
+                            </a>
+                            {% if c.profesionales.especialidad %}
+                                <span>{{ c.profesionales.especialidad }}</span>
+                            {% endif %}
+                        {% else %}
+                            <span>Proveedor no disponible</span>
+                        {% endif %}
+                    </div>
+                </div>
+
+                {% if c.profesionales and c.profesionales.ubicacion %}
+                <div class="mis-cita-ubicacion">
+                    <span>⌖</span>
+                    {{ c.profesionales.ubicacion }}
+                </div>
+                {% endif %}
+
+                <div class="mis-cita-fecha">
+                    <div>
+                        <span class="mis-cita-icono-dato">▦</span>
+                        <div>
+                            <small>Fecha</small>
+                            <strong>{{ c.fecha_txt }}</strong>
+                        </div>
+                    </div>
+                    <div>
+                        <span class="mis-cita-icono-dato">◷</span>
+                        <div>
+                            <small>Horario</small>
+                            <strong>{{ c.hora_txt }}</strong>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="mis-cita-acciones">
+                    <a class="mis-cita-boton mis-cita-boton-principal"
+                       href="{{ url_for('citas.reprogramar', cita_id=c.id) }}">
+                        Reprogramar
+                    </a>
+
+                    <form action="{{ url_for('citas.cancelar', cita_id=c.id) }}"
+                          method="post">
+                        <input type="hidden" name="csrf_token"
+                               value="{{ csrf_token() }}">
+                        <button type="submit"
+                                class="mis-cita-boton mis-cita-boton-secundario"
+                                onclick="return confirm('¿Cancelar esta cita?')">
+                            Cancelar
+                        </button>
+                    </form>
+                </div>
+
+            </article>
+            {% endfor %}
+
+        </div>
+        {% else %}
+        <div class="mis-citas-vacio">
+            <div class="mis-citas-vacio-icono">♡</div>
+            <h3>No tienes citas próximas</h3>
+            <p>Este es un buen momento para reservar un servicio y dedicarte tiempo.</p>
+            <a href="{{ url_for('profesionales.listar') }}"
+               class="mis-citas-boton mis-citas-boton-principal">
+                Explorar profesionales
+            </a>
+        </div>
+        {% endif %}
+    </section>
+
+    {% if historial %}
+    <section class="mis-citas-seccion mis-citas-historial">
+
+        <div class="mis-citas-titulo-seccion">
+            <div>
+                <span class="mis-citas-etiqueta-seccion">TUS REGISTROS</span>
+                <h2>Historial de citas</h2>
+                <p>Consulta las reservas que ya finalizaron o fueron canceladas.</p>
+            </div>
+            <span class="mis-citas-contador">{{ historial|length }}</span>
+        </div>
+
+        <div class="mis-citas-historial-lista">
+
+            {% for c in historial %}
+            <article class="mis-cita-historial-card">
+
+                <div class="mis-cita-historial-icono">♡</div>
+
+                <div class="mis-cita-historial-info">
+                    <div class="mis-cita-historial-titulo">
+                        <h3>{{ c.servicios.nombre if c.servicios else "Servicio" }}</h3>
+                        <span class="etiqueta estado-{{ c.estado }}">
+                            {{ c.estado_txt }}
+                        </span>
+                    </div>
+
+                    {% if c.profesionales %}
+                    <p>
+                        Con
+                        <a href="{{ url_for('profesionales.detalle', profesional_id=c.profesionales.id) }}">
+                            {{ c.profesionales.nombre_negocio }}
+                        </a>
+                    </p>
+                    {% endif %}
+
+                    <div class="mis-cita-historial-fecha">
+                        <span>▦ {{ c.fecha_txt }}</span>
+                        <span>◷ {{ c.hora_txt }}</span>
+                    </div>
+
+                    {% if c.estado == 'completada' %}
+                        {% if c.mi_puntuacion %}
+                            <div class="mis-cita-calificacion">
+                                Tu calificación: {{ estrellas(c.mi_puntuacion) }}
+                            </div>
+                        {% else %}
+                            <a class="mis-cita-calificar"
+                               href="{{ url_for('citas.calificar', cita_id=c.id) }}">
+                                Calificar servicio →
+                            </a>
+                        {% endif %}
+                    {% endif %}
+                </div>
+
+            </article>
+            {% endfor %}
+
+        </div>
+    </section>
+    {% endif %}
+
+</section>
+<!-- FIN AGREGADO JESUS: rediseño de Mis citas para clientes -->
+
 {% endblock %}

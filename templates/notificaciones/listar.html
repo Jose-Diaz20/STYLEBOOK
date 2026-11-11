@@ -1,25 +1,145 @@
+
 {% extends "base.html" %}
 {% block titulo %}Notificaciones · StyleBook{% endblock %}
-{% block contenido %}
-  <h1>Notificaciones</h1>
 
-  {% if notificaciones %}
-    <div class="lista-notificaciones">
-      {% for n in notificaciones %}
-        <div class="notificacion{{ ' notificacion-nueva' if not n.leida }}">
-          <p>{% if not n.leida %}<span class="etiqueta">Nueva</span> {% endif %}{% if n.tipo == 'recordatorio_cita' %}<span class="etiqueta">Recordatorio</span> {% endif %}{{ n.mensaje }}</p>
-          <p class="detalle-menor">{{ n.cuando }}</p>
+{% block contenido %}
+
+<!-- INICIO AGREGADO JESUS: rediseño de notificaciones -->
+<section class="notificaciones-pagina">
+
+    <header class="notificaciones-hero">
+        <div>
+            <span class="notificaciones-eyebrow">STYLEBOOK · AVISOS</span>
+            <h1>Notificaciones</h1>
+            <p>Mantente al tanto de tus citas y de las novedades de tu cuenta.</p>
         </div>
-      {% endfor %}
+
+        <div class="notificaciones-hero-icono" aria-hidden="true">
+            ♧
+        </div>
+    </header>
+
+    <div class="notificaciones-intro">
+        <div>
+            <span class="notificaciones-intro-icono">♧</span>
+            <div>
+                <h2>Tu centro de notificaciones</h2>
+                <p>Aquí encontrarás los avisos importantes de STYLEBOOK.</p>
+            </div>
+        </div>
+
+        <span class="notificaciones-total">
+            {{ notificaciones|length }}
+            {{ 'aviso' if notificaciones|length == 1 else 'avisos' }}
+        </span>
     </div>
-    <p style="margin-top:1.2rem">
-      {% if session.get('rol') == 'cliente' %}
-        <a class="boton boton-secundario" href="{{ url_for('citas.mis_citas') }}">Ir a mis citas</a>
-      {% else %}
-        <a class="boton boton-secundario" href="{{ url_for('citas.agenda') }}">Ir a mi agenda</a>
-      {% endif %}
-    </p>
-  {% else %}
-    <p class="vacio">No tienes notificaciones todavía.</p>
-  {% endif %}
+
+    {% if notificaciones %}
+
+    <div class="notificaciones-lista">
+
+        {% for n in notificaciones %}
+
+        <article class="notificacion-card{{ ' notificacion-card-nueva' if not n.leida else '' }}">
+
+            <div class="notificacion-card-icono">
+                {% if n.tipo == 'recordatorio_cita' %}
+                    ◷
+                {% elif 'cancel' in (n.tipo or '') %}
+                    ×
+                {% elif 'confirm' in (n.tipo or '') %}
+                    ✓
+                {% elif 'rechaz' in (n.tipo or '') %}
+                    !
+                {% else %}
+                    ♡
+                {% endif %}
+            </div>
+
+            <div class="notificacion-card-contenido">
+
+                <div class="notificacion-card-cabecera">
+
+                    <div class="notificacion-card-etiquetas">
+
+                        {% if not n.leida %}
+                            <span class="notificacion-etiqueta notificacion-etiqueta-nueva">
+                                Nueva
+                            </span>
+                        {% endif %}
+
+                        {% if n.tipo == 'recordatorio_cita' %}
+                            <span class="notificacion-etiqueta notificacion-etiqueta-recordatorio">
+                                Recordatorio
+                            </span>
+                        {% elif 'confirm' in (n.tipo or '') %}
+                            <span class="notificacion-etiqueta notificacion-etiqueta-confirmacion">
+                                Confirmación
+                            </span>
+                        {% elif 'cancel' in (n.tipo or '') %}
+                            <span class="notificacion-etiqueta notificacion-etiqueta-cancelacion">
+                                Cancelación
+                            </span>
+                        {% else %}
+                            <span class="notificacion-etiqueta notificacion-etiqueta-general">
+                                Aviso
+                            </span>
+                        {% endif %}
+
+                    </div>
+
+                    <time class="notificacion-fecha">
+                        {{ n.cuando }}
+                    </time>
+
+                </div>
+
+                <p class="notificacion-mensaje">
+                    {{ n.mensaje }}
+                </p>
+
+            </div>
+
+            {% if not n.leida %}
+                <span class="notificacion-punto" title="Notificación nueva"></span>
+            {% endif %}
+
+        </article>
+
+        {% endfor %}
+
+    </div>
+
+    {% else %}
+
+    <div class="notificaciones-vacio">
+        <div class="notificaciones-vacio-icono">♡</div>
+        <h2>No tienes notificaciones todavía</h2>
+        <p>
+            Cuando tengas novedades sobre tus citas o tu cuenta,
+            aparecerán aquí.
+        </p>
+    </div>
+
+    {% endif %}
+
+    <div class="notificaciones-pie-acciones">
+
+        {% if session.get('rol') == 'cliente' %}
+            <a class="notificaciones-boton"
+               href="{{ url_for('citas.mis_citas') }}">
+                Ir a mis citas <span aria-hidden="true">→</span>
+            </a>
+        {% else %}
+            <a class="notificaciones-boton"
+               href="{{ url_for('citas.agenda') }}">
+                Ir a mi agenda <span aria-hidden="true">→</span>
+            </a>
+        {% endif %}
+
+    </div>
+
+</section>
+<!-- FIN AGREGADO JESUS: rediseño de notificaciones -->
+
 {% endblock %}

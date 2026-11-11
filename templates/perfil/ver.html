@@ -1,35 +1,235 @@
-{% extends "base.html" %}
-{% block titulo %}Mi perfil · StyleBook{% endblock %}
-{% block contenido %}
-  {% set tipos = {'cliente': 'Cliente', 'establecimiento': 'Establecimiento', 'profesional': 'Profesional independiente', 'admin': 'Administrador'} %}
-  <section class="formulario-angosto">
-    <h1>Mi perfil</h1>
-    <p><strong>Nombre:</strong> {{ perfil.nombre }}</p>
-    <p><strong>Teléfono:</strong> {{ perfil.telefono or "No registrado" }}</p>
-    <p><strong>Tipo de cuenta:</strong> {{ tipos.get(perfil.rol, perfil.rol) }}</p>
 
+{% extends "base.html" %}
+
+{% block titulo %}Mi perfil · StyleBook{% endblock %}
+
+{% block contenido %}
+
+{% set tipos = {
+    'cliente': 'Cliente',
+    'establecimiento': 'Establecimiento',
+    'profesional': 'Profesional independiente',
+    'admin': 'Administrador'
+} %}
+
+<!-- INICIO AGREGADO JESUS: rediseño visual de Mi perfil -->
+<section class="perfil-pagina">
+
+    <!-- ENCABEZADO DE BIENVENIDA -->
+    <header class="perfil-hero">
+        <div class="perfil-hero-contenido">
+            <span class="perfil-eyebrow">STYLEBOOK · MI ESPACIO PERSONAL</span>
+            <h1>Mi perfil</h1>
+            <p>Tu espacio personal para administrar tu cuenta y disfrutar de STYLEBOOK.</p>
+        </div>
+
+        <div class="perfil-hero-decoracion" aria-hidden="true">
+            ♡
+        </div>
+    </header>
+
+    <!-- TARJETA PRINCIPAL DEL USUARIO -->
+    <section class="perfil-presentacion">
+
+        <div class="perfil-avatar">
+            {{ perfil.nombre[:1]|upper if perfil.nombre else 'U' }}
+        </div>
+
+        <div class="perfil-presentacion-datos">
+            <span class="perfil-presentacion-etiqueta">BIENVENIDO A STYLEBOOK</span>
+            <h2>{{ perfil.nombre }}</h2>
+            <span class="perfil-tipo-cuenta">
+                {{ tipos.get(perfil.rol, perfil.rol) }}
+            </span>
+        </div>
+
+        <a class="perfil-boton-editar"
+           href="{{ url_for('perfil.editar') }}">
+            <span aria-hidden="true">✎</span>
+            Editar perfil
+        </a>
+
+    </section>
+
+    <!-- INFORMACIÓN PERSONAL -->
+    <section class="perfil-seccion">
+
+        <div class="perfil-titulo-seccion">
+            <div>
+                <span class="perfil-etiqueta-seccion">TU INFORMACIÓN</span>
+                <h2>Datos personales</h2>
+                <p>Esta es la información asociada a tu cuenta.</p>
+            </div>
+
+            <span class="perfil-titulo-icono">♙</span>
+        </div>
+
+        <div class="perfil-datos-grid">
+
+            <article class="perfil-dato-card">
+                <div class="perfil-dato-icono">♙</div>
+                <div>
+                    <span>Nombre completo</span>
+                    <strong>{{ perfil.nombre }}</strong>
+                </div>
+            </article>
+
+            <article class="perfil-dato-card">
+                <div class="perfil-dato-icono">☎</div>
+                <div>
+                    <span>Teléfono de contacto</span>
+                    <strong>{{ perfil.telefono or "No registrado" }}</strong>
+                </div>
+            </article>
+
+            <article class="perfil-dato-card">
+                <div class="perfil-dato-icono">▣</div>
+                <div>
+                    <span>Tipo de cuenta</span>
+                    <strong>{{ tipos.get(perfil.rol, perfil.rol) }}</strong>
+                </div>
+            </article>
+
+        </div>
+
+    </section>
+
+    <!-- INFORMACIÓN DEL NEGOCIO -->
     {% if negocio %}
-      <h2 style="margin-top:1.4rem">Mi negocio</h2>
-      <p><strong>{{ negocio.nombre_negocio }}</strong> &middot; {{ negocio.especialidad }}</p>
-      <p><strong>Ubicación:</strong> {{ negocio.ubicacion or "No registrada" }}</p>
-      <p><strong>Estado:</strong>
-        <span class="etiqueta">{{ {'pendiente': 'En revisión', 'aprobado': 'Publicado', 'rechazado': 'Rechazado'}[negocio.estado] }}</span>
-      </p>
-      {% if negocio.estado == 'aprobado' %}
-        <p><strong>Visibilidad:</strong>
-          <span class="etiqueta {{ 'estado-confirmada' if negocio.get('activo', True) else 'estado-pendiente' }}">{{ "Activo" if negocio.get('activo', True) else "Inactivo" }}</span>
-        </p>
-      {% endif %}
+
+    <section class="perfil-seccion perfil-negocio-seccion">
+
+        <div class="perfil-titulo-seccion">
+            <div>
+                <span class="perfil-etiqueta-seccion">TU ACTIVIDAD EN STYLEBOOK</span>
+                <h2>Mi negocio</h2>
+                <p>Consulta la información y el estado de tu negocio.</p>
+            </div>
+
+            <span class="perfil-titulo-icono">✧</span>
+        </div>
+
+        <article class="perfil-negocio-card">
+
+            <div class="perfil-negocio-cabecera">
+                <div class="perfil-negocio-icono">✧</div>
+
+                <div class="perfil-negocio-nombre">
+                    <span>ESTABLECIMIENTO / PROFESIONAL</span>
+                    <h3>{{ negocio.nombre_negocio }}</h3>
+                    <p>{{ negocio.especialidad or "Especialidad no registrada" }}</p>
+                </div>
+
+                <span class="etiqueta">
+                    {{ {
+                        'pendiente': 'En revisión',
+                        'aprobado': 'Publicado',
+                        'rechazado': 'Rechazado'
+                    }.get(negocio.estado, negocio.estado) }}
+                </span>
+            </div>
+
+            <div class="perfil-negocio-detalles">
+
+                <div>
+                    <span class="perfil-negocio-detalle-icono">⌖</span>
+                    <div>
+                        <small>Ubicación</small>
+                        <strong>{{ negocio.ubicacion or "No registrada" }}</strong>
+                    </div>
+                </div>
+
+                {% if negocio.estado == 'aprobado' %}
+                <div>
+                    <span class="perfil-negocio-detalle-icono">●</span>
+                    <div>
+                        <small>Visibilidad del negocio</small>
+                        <strong>
+                            {{ "Activo" if negocio.get('activo', True) else "Inactivo" }}
+                        </strong>
+                    </div>
+                </div>
+                {% endif %}
+
+            </div>
+
+            {% if negocio.estado == 'aprobado' %}
+            <div class="perfil-negocio-nota">
+                Tu negocio está publicado en STYLEBOOK.
+            </div>
+            {% elif negocio.estado == 'pendiente' %}
+            <div class="perfil-negocio-nota perfil-negocio-pendiente">
+                Tu solicitud se encuentra en revisión.
+            </div>
+            {% elif negocio.estado == 'rechazado' %}
+            <div class="perfil-negocio-nota perfil-negocio-rechazado">
+                Tu solicitud fue rechazada. Puedes revisar la información de tu negocio.
+            </div>
+            {% endif %}
+
+        </article>
+
+    </section>
+
     {% endif %}
 
-    <div class="acciones">
-      <a class="boton" href="{{ url_for('perfil.editar') }}">Editar perfil</a>
-      {% if perfil.rol in ['establecimiento', 'profesional'] %}
-        <a class="boton boton-secundario" href="{{ url_for('profesionales.editar_negocio') if negocio else url_for('profesionales.registro') }}">
-          {{ "Editar mi negocio" if negocio else "Registrar mi negocio" }}
-        </a>
-        <a class="boton boton-secundario" href="{{ url_for('servicios.gestionar') }}">Gestionar mis servicios</a>
-      {% endif %}
-    </div>
-  </section>
+    <!-- ACCIONES DE LA CUENTA -->
+    <section class="perfil-seccion">
+
+        <div class="perfil-titulo-seccion">
+            <div>
+                <span class="perfil-etiqueta-seccion">ADMINISTRA TU CUENTA</span>
+                <h2>Accesos rápidos</h2>
+                <p>Encuentra fácilmente las opciones de tu perfil.</p>
+            </div>
+        </div>
+
+        <div class="perfil-acciones-grid">
+
+            <a href="{{ url_for('perfil.editar') }}"
+               class="perfil-accion-card">
+                <span class="perfil-accion-icono">✎</span>
+                <span class="perfil-accion-texto">
+                    <strong>Editar mi perfil</strong>
+                    <small>Actualiza tus datos personales.</small>
+                </span>
+                <span class="perfil-accion-flecha">→</span>
+            </a>
+
+            {% if perfil.rol in ['establecimiento', 'profesional'] %}
+
+            <a href="{{ url_for('profesionales.editar_negocio') if negocio else url_for('profesionales.registro') }}"
+               class="perfil-accion-card">
+                <span class="perfil-accion-icono">✧</span>
+                <span class="perfil-accion-texto">
+                    <strong>{{ "Editar mi negocio" if negocio else "Registrar mi negocio" }}</strong>
+                    <small>Administra la información de tu negocio.</small>
+                </span>
+                <span class="perfil-accion-flecha">→</span>
+            </a>
+
+            <a href="{{ url_for('servicios.gestionar') }}"
+               class="perfil-accion-card">
+                <span class="perfil-accion-icono">▤</span>
+                <span class="perfil-accion-texto">
+                    <strong>Gestionar mis servicios</strong>
+                    <small>Administra los servicios que ofreces.</small>
+                </span>
+                <span class="perfil-accion-flecha">→</span>
+            </a>
+
+            {% endif %}
+
+        </div>
+
+    </section>
+
+    <footer class="perfil-pie">
+        <span>♡</span>
+        Cuida tu estilo, siempre.
+    </footer>
+
+</section>
+<!-- FIN AGREGADO JESUS: rediseño visual de Mi perfil -->
+
 {% endblock %}

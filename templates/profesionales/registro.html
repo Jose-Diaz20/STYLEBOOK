@@ -1,61 +1,184 @@
+
 {% extends "base.html" %}
 {% set editando = negocio and negocio.get('id') %}
+
 {% block titulo %}{{ "Mi negocio" if editando else "Registrar mi negocio" }} · StyleBook{% endblock %}
+
 {% block contenido %}
-  <section class="formulario-angosto">
-    <h1>{{ "Datos de mi negocio" if editando else "Registra tu negocio" }}</h1>
-    <p>Esta información aparece en tu perfil público. Mantenla actualizada: servicios, precios, horarios y contacto.</p>
-    <form method="POST">
-      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}" />
-      <label for="nombre_negocio">Nombre del negocio o profesional</label>
-      <input type="text" id="nombre_negocio" name="nombre_negocio" maxlength="100"
-             value="{{ negocio.nombre_negocio if negocio else '' }}" required />
 
-      <label for="especialidad">Especialidad</label>
-      <input type="text" id="especialidad" name="especialidad" maxlength="100"
-             placeholder="Ej. Barbería, Colorimetría, Uñas"
-             value="{{ negocio.especialidad if negocio else '' }}" required />
+<!-- INICIO AGREGADO JESUS: Página de administración del negocio -->
+<section class="mi-negocio-pagina">
 
-      <label for="descripcion">Descripción</label>
-      <textarea id="descripcion" name="descripcion" rows="4" maxlength="1000">{{ negocio.descripcion or '' if negocio else '' }}</textarea>
-
-      <label for="ubicacion">Ubicación (dirección y ciudad)</label>
-      <input type="text" id="ubicacion" name="ubicacion" maxlength="200"
-             placeholder="Ej. Cra 5 # 10-20, Cúcuta"
-             value="{{ negocio.ubicacion or '' if negocio else '' }}" required />
-
-      <label for="telefono">Teléfono de contacto</label>
-      <input type="tel" id="telefono" name="telefono" maxlength="20"
-             value="{{ negocio.telefono or '' if negocio else '' }}" required />
-
-      <label for="anios_experiencia">Años de experiencia</label>
-      <input type="number" id="anios_experiencia" name="anios_experiencia" min="0" max="80"
-             value="{{ negocio.anios_experiencia or 0 if negocio else 0 }}" />
-
-      <button type="submit" class="boton">{{ "Guardar cambios" if editando else "Completar registro" }}</button>
-    </form>
-       {% if editando %}
-      {% set esta_activo = negocio.get('activo', True) %}
-      <h2 style="margin-top:1.6rem">Estado de mi negocio</h2>
+  <!-- Encabezado -->
+  <div class="mi-negocio-hero">
+    <div>
+      <span class="mi-negocio-eyebrow">STYLEBOOK · MI ESPACIO PROFESIONAL</span>
+      <h1>{{ "Datos de mi negocio" if editando else "Registra tu negocio" }}</h1>
       <p>
-        <span class="etiqueta {{ 'estado-confirmada' if esta_activo else 'estado-pendiente' }}">
-          {{ "Activo" if esta_activo else "Inactivo" }}
-        </span>
+        {{ "Administra y mantén actualizada la información de tu negocio." if editando else "Completa la información para presentar tu negocio a nuevos clientes." }}
       </p>
-      <p class="detalle-menor">
-        {% if esta_activo %}
-          Los clientes pueden verte y reservar contigo.
-        {% else %}
-          No apareces en el listado ni recibes reservas nuevas. Tus citas actuales se conservan.
-        {% endif %}
-      </p>
-      <form method="POST" action="{{ url_for('profesionales.cambiar_activo') }}">
-        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}" />
-        <button type="submit" class="boton boton-secundario">
-          {{ "Marcarme como inactivo" if esta_activo else "Marcarme como activo" }}
-        </button>
-      </form>
-    {% endif %}
-    {% if editando %}<p><a href="{{ url_for('perfil.ver') }}">Volver a mi perfil</a></p>{% endif %}
-  </section>
+    </div>
+
+    <div class="mi-negocio-hero-icono">✦</div>
+  </div>
+
+  <div class="mi-negocio-layout">
+
+    <!-- Formulario principal -->
+    <div class="mi-negocio-formulario-contenedor">
+
+      <div class="mi-negocio-card">
+        <div class="mi-negocio-card-titulo">
+          <div class="mi-negocio-icono">▤</div>
+          <div>
+            <h2>Información del negocio</h2>
+            <p>Los datos que verán tus clientes en tu perfil público.</p>
+          </div>
+        </div>
+
+        <form method="POST" class="mi-negocio-formulario">
+
+          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}" />
+
+          <div class="mi-negocio-campo">
+            <label for="nombre_negocio">Nombre del negocio o profesional</label>
+            <input type="text" id="nombre_negocio" name="nombre_negocio" maxlength="100"
+                   value="{{ negocio.nombre_negocio if negocio else '' }}" required />
+          </div>
+
+          <div class="mi-negocio-campo">
+            <label for="especialidad">Especialidad</label>
+            <input type="text" id="especialidad" name="especialidad" maxlength="100"
+                   placeholder="Ej. Barbería, Colorimetría, Uñas"
+                   value="{{ negocio.especialidad if negocio else '' }}" required />
+          </div>
+
+          <div class="mi-negocio-campo">
+            <label for="descripcion">Descripción</label>
+            <textarea id="descripcion" name="descripcion" rows="4" maxlength="1000"
+                      placeholder="Cuéntales a tus clientes sobre tu negocio y los servicios que ofreces...">{{ negocio.descripcion or '' if negocio else '' }}</textarea>
+            <span class="mi-negocio-ayuda">Máximo 1000 caracteres.</span>
+          </div>
+
+          <div class="mi-negocio-separador"></div>
+
+          <div class="mi-negocio-campo">
+            <label for="ubicacion">Ubicación (dirección y ciudad)</label>
+            <input type="text" id="ubicacion" name="ubicacion" maxlength="200"
+                   placeholder="Ej. Cra 5 # 10-20, Cúcuta"
+                   value="{{ negocio.ubicacion or '' if negocio else '' }}" required />
+          </div>
+
+          <div class="mi-negocio-campo">
+            <label for="telefono">Teléfono de contacto</label>
+            <input type="tel" id="telefono" name="telefono" maxlength="20"
+                   value="{{ negocio.telefono or '' if negocio else '' }}" required />
+          </div>
+
+          <div class="mi-negocio-campo">
+            <label for="anios_experiencia">Años de experiencia</label>
+            <input type="number" id="anios_experiencia" name="anios_experiencia"
+                   min="0" max="80"
+                   value="{{ negocio.anios_experiencia or 0 if negocio else 0 }}" />
+          </div>
+
+          <div class="mi-negocio-boton-contenedor">
+            <button type="submit" class="mi-negocio-boton-principal">
+              {{ "Guardar cambios" if editando else "Completar registro" }}
+              <span>→</span>
+            </button>
+          </div>
+
+        </form>
+      </div>
+
+      {% if editando %}
+        {% set esta_activo = negocio.get('activo', True) %}
+
+        <!-- Estado y disponibilidad -->
+        <div class="mi-negocio-card mi-negocio-estado-card">
+          <div class="mi-negocio-card-titulo">
+            <div class="mi-negocio-icono">◉</div>
+            <div>
+              <h2>Estado de mi negocio</h2>
+              <p>Controla si tu negocio está disponible para nuevos clientes.</p>
+            </div>
+          </div>
+
+          <div class="mi-negocio-estado-informacion">
+            <div>
+              <span class="mi-negocio-label-estado">Estado actual</span>
+              <span class="etiqueta {{ 'estado-confirmada' if esta_activo else 'estado-pendiente' }}">
+                {{ "Activo" if esta_activo else "Inactivo" }}
+              </span>
+            </div>
+          </div>
+
+          <p class="mi-negocio-estado-descripcion">
+            {% if esta_activo %}
+              Los clientes pueden verte y reservar contigo.
+            {% else %}
+              No apareces en el listado ni recibes reservas nuevas. Tus citas actuales se conservan.
+            {% endif %}
+          </p>
+
+          <form method="POST" action="{{ url_for('profesionales.cambiar_activo') }}">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}" />
+            <button type="submit" class="mi-negocio-boton-estado">
+              {{ "Marcarme como inactivo" if esta_activo else "Marcarme como activo" }}
+            </button>
+          </form>
+        </div>
+      {% endif %}
+
+      {% if editando %}
+        <div class="mi-negocio-volver">
+          <a href="{{ url_for('perfil.ver') }}">← Volver a mi perfil</a>
+        </div>
+      {% endif %}
+
+    </div>
+
+    <!-- Panel informativo -->
+    <aside class="mi-negocio-lateral">
+
+      <div class="mi-negocio-consejo">
+        <span class="mi-negocio-consejo-icono">✧</span>
+        <h2>Haz que tu negocio destaque</h2>
+        <p>
+          Una información clara y actualizada ayuda a que los clientes conozcan
+          mejor tu negocio y tengan más confianza al momento de reservar.
+        </p>
+      </div>
+
+      <div class="mi-negocio-guia">
+        <h3>Ten en cuenta</h3>
+
+        <div class="mi-negocio-guia-item">
+          <span>01</span>
+          <p>Utiliza el nombre con el que tus clientes te reconocen.</p>
+        </div>
+
+        <div class="mi-negocio-guia-item">
+          <span>02</span>
+          <p>Describe tu especialidad de manera clara.</p>
+        </div>
+
+        <div class="mi-negocio-guia-item">
+          <span>03</span>
+          <p>Mantén actualizados tu teléfono y ubicación.</p>
+        </div>
+
+        <div class="mi-negocio-guia-item">
+          <span>04</span>
+          <p>Indica tus años de experiencia para dar más información a tus clientes.</p>
+        </div>
+      </div>
+
+    </aside>
+
+  </div>
+</section>
+<!-- FIN AGREGADO JESUS: Página de administración del negocio -->
+
 {% endblock %}

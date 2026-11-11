@@ -1,57 +1,210 @@
+
 {% extends "base.html" %}
 {% block titulo %}{{ profesional.nombre_negocio }} · StyleBook{% endblock %}
 {% block contenido %}
-  {% from "macros.html" import estrellas %}
-  <section>
-    <div class="encabezado-profesional">
-      <div class="avatar-iniciales avatar-grande">{{ profesional.nombre_negocio[0]|upper }}</div>
-      <div>
+{% from "macros.html" import estrellas %}
+
+<!-- INICIO AGREGADO JESUS: Página pública del negocio -->
+<section class="negocio-publico">
+
+  <!-- Encabezado del negocio -->
+  <div class="negocio-portada">
+    <div class="negocio-portada-contenido">
+      <div class="avatar-iniciales avatar-grande negocio-avatar">
+        {{ profesional.nombre_negocio[0]|upper }}
+      </div>
+
+      <div class="negocio-identidad">
+        <span class="negocio-subtitulo">CONOCE A NUESTROS PROFESIONALES</span>
         <h1>{{ profesional.nombre_negocio }}</h1>
-        <span class="etiqueta">{{ profesional.especialidad }}</span>
-        <span class="etiqueta">{{ "Establecimiento" if profesional.tipo_proveedor == 'establecimiento' else "Profesional independiente" }}</span>
+
+        <div class="negocio-etiquetas">
+          <span class="etiqueta">{{ profesional.especialidad }}</span>
+          <span class="etiqueta">
+            {{ "Establecimiento" if profesional.tipo_proveedor == 'establecimiento' else "Profesional independiente" }}
+          </span>
+        </div>
       </div>
     </div>
-    <p>{{ profesional.descripcion or "Sin descripción" }}</p>
-    <p class="detalle-menor">
-      {% if profesional.total_calificaciones %}
-        {{ estrellas(profesional.calificacion_promedio) }}
-        <strong>{{ "%.1f"|format(profesional.calificacion_promedio) }}</strong>
-        &middot; {{ profesional.total_calificaciones }} {{ 'opinión' if profesional.total_calificaciones == 1 else 'opiniones' }}
-      {% else %}Aún no tiene opiniones{% endif %}
-    </p>
-    <p class="detalle-menor">
-      {% if profesional.ubicacion %}📍 {{ profesional.ubicacion }}{% endif %}
-      {% if profesional.telefono %} &middot; ☎ {{ profesional.telefono }}{% endif %}
-      {% if profesional.anios_experiencia %} &middot; {{ profesional.anios_experiencia }} años de experiencia{% endif %}
-    </p>
+  </div>
 
-        <h2 id="opiniones" style="margin-top:1.6rem">Opiniones de clientes</h2>
-    {% if servicio_filtrado %}
-      <p class="detalle-menor">Mostrando solo las del servicio <strong>{{ servicio_filtrado.nombre }}</strong>
-        &middot; <a href="{{ url_for('profesionales.detalle', profesional_id=profesional.id) }}#opiniones">Ver todas</a></p>
-    {% endif %}
-    {% if opiniones %}
-      <ul class="lista-opiniones">
-        {% for o in opiniones %}
-          <li>
-            <div>
-              {{ estrellas(o.puntuacion) }} <strong>{{ o.cliente_nombre or "Cliente" }}</strong>
-              <span class="detalle-menor">&middot; {{ o.fecha_txt }}{% if o.servicio_nombre %} &middot; {{ o.servicio_nombre }}{% endif %}</span>
-            </div>
-            {% if o.comentario %}<p>{{ o.comentario }}</p>{% endif %}
-          </li>
-        {% endfor %}
-      </ul>
-    {% else %}
-      <p>Todavía no hay opiniones{{ " de este servicio" if servicio_filtrado else "" }}.</p>
-    {% endif %}
+  <!-- Información general -->
+  <div class="negocio-contenido">
 
-    <div style="margin-top:1.6rem">
-      {% if not session.get('access_token') %}
-        <p><a href="{{ url_for('auth.login', volver=request.path) }}">Inicia sesión</a> para reservar una cita.</p>
-      {% elif session.get('rol') == 'cliente' %}
-        <a href="{{ url_for('citas.reservar', profesional_id=profesional.id) }}" class="boton">Reservar cita</a>
-      {% endif %}
+    <div class="negocio-columna-principal">
+
+      <article class="negocio-tarjeta">
+        <div class="negocio-titulo-seccion">
+          <span class="negocio-icono">✦</span>
+          <div>
+            <h2>Sobre nosotros</h2>
+            <p>Conoce un poco más sobre este negocio</p>
+          </div>
+        </div>
+
+        <p class="negocio-descripcion">
+          {{ profesional.descripcion or "Sin descripción" }}
+        </p>
+      </article>
+
+      <!-- Opiniones de clientes -->
+      <article class="negocio-tarjeta" id="opiniones">
+        <div class="negocio-titulo-seccion">
+          <span class="negocio-icono">★</span>
+          <div>
+            <h2>Opiniones de clientes</h2>
+            <p>Experiencias de personas que han recibido sus servicios</p>
+          </div>
+        </div>
+
+        {% if servicio_filtrado %}
+          <div class="negocio-filtro-opiniones">
+            Mostrando solo las opiniones del servicio
+            <strong>{{ servicio_filtrado.nombre }}</strong>.
+
+            <a href="{{ url_for('profesionales.detalle', profesional_id=profesional.id) }}#opiniones">
+              Ver todas las opiniones
+            </a>
+          </div>
+        {% endif %}
+
+        {% if opiniones %}
+          <ul class="lista-opiniones negocio-lista-opiniones">
+            {% for o in opiniones %}
+              <li class="negocio-opinion">
+                <div class="negocio-opinion-superior">
+                  <div class="negocio-opinion-cliente">
+                    <span class="negocio-cliente-avatar">
+                      {{ (o.cliente_nombre or "C")[0]|upper }}
+                    </span>
+
+                    <div>
+                      <strong>{{ o.cliente_nombre or "Cliente" }}</strong>
+                      <span class="negocio-opinion-fecha">
+                        {{ o.fecha_txt }}
+                      </span>
+                    </div>
+                  </div>
+
+                  <div class="negocio-opinion-estrellas">
+                    {{ estrellas(o.puntuacion) }}
+                  </div>
+                </div>
+
+                {% if o.servicio_nombre %}
+                  <span class="negocio-opinion-servicio">
+                    {{ o.servicio_nombre }}
+                  </span>
+                {% endif %}
+
+                {% if o.comentario %}
+                  <p class="negocio-opinion-comentario">
+                    {{ o.comentario }}
+                  </p>
+                {% endif %}
+              </li>
+            {% endfor %}
+          </ul>
+        {% else %}
+          <div class="negocio-sin-opiniones">
+            <span>☆</span>
+            <h3>Aún no hay opiniones</h3>
+            <p>
+              Todavía no se han registrado opiniones
+              {{ " de este servicio" if servicio_filtrado else "" }}.
+            </p>
+          </div>
+        {% endif %}
+      </article>
+
     </div>
-  </section>
+
+    <!-- Información lateral -->
+    <aside class="negocio-columna-lateral">
+
+      <div class="negocio-tarjeta negocio-calificacion">
+        <span class="negocio-lateral-titulo">CALIFICACIÓN</span>
+
+        {% if profesional.total_calificaciones %}
+          <strong class="negocio-promedio">
+            {{ "%.1f"|format(profesional.calificacion_promedio) }}
+          </strong>
+
+          <div class="negocio-estrellas">
+            {{ estrellas(profesional.calificacion_promedio) }}
+          </div>
+
+          <p>
+            {{ profesional.total_calificaciones }}
+            {{ 'opinión' if profesional.total_calificaciones == 1 else 'opiniones' }}
+            de clientes
+          </p>
+        {% else %}
+          <strong class="negocio-promedio">—</strong>
+          <p>Aún no tiene opiniones</p>
+        {% endif %}
+      </div>
+
+      <div class="negocio-tarjeta negocio-datos">
+        <div class="negocio-titulo-seccion">
+          <span class="negocio-icono">⌖</span>
+          <div>
+            <h2>Información</h2>
+            <p>Datos de contacto y experiencia</p>
+          </div>
+        </div>
+
+        {% if profesional.ubicacion %}
+          <div class="negocio-dato">
+            <span class="negocio-dato-icono">📍</span>
+            <div>
+              <strong>Ubicación</strong>
+              <p>{{ profesional.ubicacion }}</p>
+            </div>
+          </div>
+        {% endif %}
+
+        {% if profesional.telefono %}
+          <div class="negocio-dato">
+            <span class="negocio-dato-icono">☎</span>
+            <div>
+              <strong>Teléfono</strong>
+              <p>{{ profesional.telefono }}</p>
+            </div>
+          </div>
+        {% endif %}
+
+        {% if profesional.anios_experiencia %}
+          <div class="negocio-dato">
+            <span class="negocio-dato-icono">✧</span>
+            <div>
+              <strong>Experiencia</strong>
+              <p>{{ profesional.anios_experiencia }} años</p>
+            </div>
+          </div>
+        {% endif %}
+      </div>
+
+      <!-- Acceso para reservar -->
+      <div class="negocio-reserva">
+        <span class="negocio-reserva-icono">✦</span>
+        <h2>¿Te interesa este servicio?</h2>
+        <p>Da el siguiente paso y agenda tu próxima cita.</p>
+
+        {% if not session.get('access_token') %}
+          <a href="{{ url_for('auth.login', volver=request.path) }}" class="negocio-boton-reserva">
+            Iniciar sesión para reservar
+          </a>
+        {% elif session.get('rol') == 'cliente' %}
+          <a href="{{ url_for('citas.reservar', profesional_id=profesional.id) }}" class="negocio-boton-reserva">
+            Reservar una cita
+          </a>
+        {% endif %}
+      </div>
+
+    </aside>
+  </div>
+</section>
+<!-- FIN AGREGADO JESUS: Página pública del negocio -->
+
 {% endblock %}

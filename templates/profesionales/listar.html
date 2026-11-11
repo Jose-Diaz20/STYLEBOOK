@@ -1,29 +1,231 @@
 {% extends "base.html" %}
 {% block titulo %}Profesionales · StyleBook{% endblock %}
 {% block contenido %}
-  {% from "macros.html" import estrellas %}
-  <section>
-    <h1>Salones, barberías y profesionales</h1>
+
+<!-- INICIO AGREGADO JESUS: nuevo diseño de la página pública de profesionales -->
+<section class="profesionales-pagina">
+
+    <div class="profesionales-hero">
+        <div class="profesionales-hero-texto">
+            <span class="profesionales-eyebrow">NUESTRO EQUIPO</span>
+            <h1>Profesionales</h1>
+            <p>Expertos en belleza y bienestar, listos para cuidar de ti.</p>
+        </div>
+
+        <div class="profesionales-hero-frase">
+            <span>Confía en</span>
+            <strong>los mejores ♡</strong>
+        </div>
+    </div>
+
+    <div class="profesionales-controles">
+        <label class="profesionales-buscador" for="buscar-profesional">
+            <span aria-hidden="true">⌕</span>
+            <input
+                id="buscar-profesional"
+                type="search"
+                placeholder="Buscar un profesional..."
+                autocomplete="off">
+        </label>
+
+        <nav class="profesionales-filtros"
+             aria-label="Filtrar profesionales por especialidad">
+
+            <button type="button"
+                    class="profesional-filtro activo"
+                    data-filtro="todos">Todos</button>
+
+            <button type="button"
+                    class="profesional-filtro"
+                    data-filtro="barbería">Barbería</button>
+
+            <button type="button"
+                    class="profesional-filtro"
+                    data-filtro="uñas">Uñas</button>
+
+            <button type="button"
+                    class="profesional-filtro"
+                    data-filtro="spa">Spa</button>
+
+            <button type="button"
+                    class="profesional-filtro"
+                    data-filtro="maquillaje">Maquillaje</button>
+        </nav>
+    </div>
+
     {% if profesionales %}
-      <div class="rejilla-tarjetas">
+    <div class="profesionales-grid" id="profesionales-grid">
+
         {% for p in profesionales %}
-          <a class="tarjeta tarjeta-profesional" href="{{ url_for('profesionales.detalle', profesional_id=p.id) }}">
-            <div class="avatar-iniciales">{{ p.nombre_negocio[0]|upper }}</div>
-            <div>
-              <h2>{{ p.nombre_negocio }}</h2>
-              <span class="etiqueta">{{ p.especialidad }}</span>
-              <span class="etiqueta">{{ "Establecimiento" if p.tipo_proveedor == 'establecimiento' else "Independiente" }}</span>
-              {% if p.total_calificaciones %}
-                <p class="detalle-menor">{{ estrellas(p.calificacion_promedio) }} {{ "%.1f"|format(p.calificacion_promedio) }} ({{ p.total_calificaciones }})</p>
-              {% endif %}
-              <p>{{ p.descripcion or "Sin descripción" }}</p>
-              {% if p.ubicacion %}<p class="detalle-menor">📍 {{ p.ubicacion }}</p>{% endif %}
+        {% set especialidad_txt = p.especialidad or '' %}
+
+        <article class="profesional-card"
+            data-categoria="{{ especialidad_txt|lower }}"
+            data-busqueda="{{ (p.nombre_negocio ~ ' ' ~ especialidad_txt ~ ' ' ~ (p.descripcion or '') ~ ' ' ~ (p.ubicacion or ''))|lower }}">
+
+            <a class="profesional-card-imagen-link"
+               href="{{ url_for('profesionales.detalle', profesional_id=p.id) }}"
+               aria-label="Ver perfil de {{ p.nombre_negocio }}">
+
+                {% if p.foto_url %}
+                    <img
+                        class="profesional-card-imagen"
+                        src="{{ p.foto_url }}"
+                        alt="Fotografía de {{ p.nombre_negocio }}"
+                        loading="lazy">
+                {% else %}
+                    <div class="profesional-card-avatar">
+                        {{ (p.nombre_negocio or 'S')[:1]|upper }}
+                    </div>
+                {% endif %}
+
+                <span class="profesional-card-etiqueta">
+                    {{ especialidad_txt }}
+                </span>
+            </a>
+
+            <div class="profesional-card-contenido">
+
+                <h2>{{ p.nombre_negocio }}</h2>
+
+                <p class="profesional-card-especialidad">
+                    {{ especialidad_txt }}
+                </p>
+
+                <div class="profesional-card-datos">
+
+                    {% if p.total_calificaciones %}
+                    <span class="profesional-card-rating">
+                        <span class="profesional-estrella">★</span>
+                        <strong>{{ "%.1f"|format(p.calificacion_promedio) }}</strong>
+                        <small>({{ p.total_calificaciones }} reseñas)</small>
+                    </span>
+                    {% else %}
+                    <span class="profesional-card-sin-rating">
+                        Aún sin opiniones
+                    </span>
+                    {% endif %}
+
+                    <span>
+                        ▣ {{ p.anios_experiencia or 0 }}
+                        {{ 'año' if (p.anios_experiencia or 0) == 1 else 'años' }}
+                        de experiencia
+                    </span>
+
+                    {% if p.ubicacion %}
+                    <span>⌖ {{ p.ubicacion }}</span>
+                    {% endif %}
+
+                </div>
+
+                {% if p.descripcion %}
+                <p class="profesional-card-descripcion">
+                    {{ p.descripcion }}
+                </p>
+                {% endif %}
+
+                <a class="profesional-card-boton"
+                   href="{{ url_for('profesionales.detalle', profesional_id=p.id) }}">
+                    Ver perfil <span aria-hidden="true">→</span>
+                </a>
+
             </div>
-          </a>
+        </article>
         {% endfor %}
-      </div>
+
+    </div>
+
+    <p class="profesionales-sin-resultados"
+       id="profesionales-sin-resultados" hidden>
+        No encontramos profesionales que coincidan con tu búsqueda.
+    </p>
+
     {% else %}
-      <p>Todavía no hay proveedores publicados.</p>
+
+    <div class="profesionales-vacio">
+        <span>♡</span>
+        <h2>Pronto encontrarás profesionales aquí</h2>
+        <p>
+            En este momento no hay profesionales publicados.
+            Vuelve a visitarnos pronto.
+        </p>
+    </div>
+
     {% endif %}
-  </section>
+
+</section>
+
+<script>
+    // INICIO AGREGADO JESUS: búsqueda y filtros locales de profesionales.
+    document.addEventListener("DOMContentLoaded", function () {
+
+        const campo = document.getElementById("buscar-profesional");
+        const tarjetas = Array.from(
+            document.querySelectorAll(".profesional-card")
+        );
+        const botones = Array.from(
+            document.querySelectorAll(".profesional-filtro")
+        );
+        const mensaje = document.getElementById(
+            "profesionales-sin-resultados"
+        );
+
+        let filtroActual = "todos";
+
+        function aplicarFiltros() {
+            const termino = campo
+                ? campo.value.trim().toLocaleLowerCase("es")
+                : "";
+
+            let visibles = 0;
+
+            tarjetas.forEach(function (tarjeta) {
+
+                const texto = tarjeta.dataset.busqueda || "";
+                const categoria = tarjeta.dataset.categoria || "";
+
+                const coincideCategoria =
+                    filtroActual === "todos" ||
+                    categoria.includes(filtroActual) ||
+                    (
+                        filtroActual === "barbería" &&
+                        categoria.includes("barber")
+                    );
+
+                tarjeta.hidden = !(
+                    texto.includes(termino) && coincideCategoria
+                );
+
+                if (!tarjeta.hidden) {
+                    visibles += 1;
+                }
+            });
+
+            if (mensaje) {
+                mensaje.hidden = visibles !== 0;
+            }
+        }
+
+        if (campo) {
+            campo.addEventListener("input", aplicarFiltros);
+        }
+
+        botones.forEach(function (boton) {
+
+            boton.addEventListener("click", function () {
+
+                filtroActual = boton.dataset.filtro;
+
+                botones.forEach(function (item) {
+                    item.classList.toggle("activo", item === boton);
+                });
+
+                aplicarFiltros();
+            });
+        });
+    });
+    // FIN AGREGADO JESUS: búsqueda y filtros locales de profesionales.
+</script>
+<!-- FIN AGREGADO JESUS: nuevo diseño de la página pública de profesionales -->
+
 {% endblock %}

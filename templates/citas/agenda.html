@@ -1,21 +1,105 @@
+
 {% extends "base.html" %}
 {% block titulo %}Mi agenda · StyleBook{% endblock %}
-{% block contenido %}
-  <h1>Mi agenda</h1>
 
-  <h2 style="margin-top:1.2rem">Por atender</h2>
-  {% if por_atender %}
-    <div class="rejilla">
-      {% for c in por_atender %}{% with modo='proveedor' %}{% include "citas/_tarjeta_cita.html" %}{% endwith %}{% endfor %}
+{% block contenido %}
+
+<!-- INICIO AGREGADO JESUS: REDISEÑO DE MI AGENDA DEL PROFESIONAL -->
+<section class="agenda-profesional">
+
+  <div class="agenda-encabezado">
+    <div class="agenda-encabezado-texto">
+      <span class="agenda-subtitulo">STYLEBOOK · ESPACIO PROFESIONAL</span>
+      <h1>Mi agenda</h1>
+      <p>Organiza tus citas y mantente al día con tus clientes.</p>
     </div>
-  {% else %}
-    <p class="vacio">No tienes citas pendientes por atender.</p>
-  {% endif %}
+
+    <div class="agenda-icono">
+      <span>▦</span>
+    </div>
+  </div>
+
+  <div class="agenda-resumen">
+
+    <article class="agenda-resumen-card">
+      <div class="agenda-resumen-icono">◷</div>
+      <div>
+        <span>Citas por atender</span>
+        <strong>{{ por_atender|length }}</strong>
+        <small>Reservas pendientes de atención</small>
+      </div>
+    </article>
+
+    <article class="agenda-resumen-card">
+      <div class="agenda-resumen-icono">✓</div>
+      <div>
+        <span>Citas en historial</span>
+        <strong>{{ historial|length }}</strong>
+        <small>Registros anteriores</small>
+      </div>
+    </article>
+
+  </div>
+
+  <div class="agenda-seccion">
+
+    <div class="agenda-titulo-seccion">
+      <div>
+        <span class="agenda-etiqueta">TU ACTIVIDAD</span>
+        <h2>Por atender</h2>
+        <p>Estas son las citas que tienes pendientes.</p>
+      </div>
+
+      <span class="agenda-contador">
+        {{ por_atender|length }}
+      </span>
+    </div>
+
+    {% if por_atender %}
+      <div class="rejilla agenda-rejilla">
+        {% for c in por_atender %}
+          {% with modo='proveedor' %}
+            {% include "citas/_tarjeta_cita.html" %}
+          {% endwith %}
+        {% endfor %}
+      </div>
+    {% else %}
+      <div class="agenda-vacio">
+        <div class="agenda-vacio-icono">◷</div>
+        <h3>No tienes citas pendientes</h3>
+        <p>Cuando recibas nuevas reservas, aparecerán aquí para que puedas gestionarlas.</p>
+      </div>
+    {% endif %}
+
+  </div>
 
   {% if historial %}
-    <h2 style="margin-top:2rem">Historial</h2>
-    <div class="rejilla">
-      {% for c in historial %}{% with modo='proveedor' %}{% include "citas/_tarjeta_cita.html" %}{% endwith %}{% endfor %}
+    <div class="agenda-seccion agenda-historial">
+
+      <div class="agenda-titulo-seccion">
+        <div>
+          <span class="agenda-etiqueta">REGISTROS ANTERIORES</span>
+          <h2>Historial de citas</h2>
+          <p>Consulta las citas que ya forman parte de tu historial.</p>
+        </div>
+
+        <span class="agenda-contador agenda-contador-historial">
+          {{ historial|length }}
+        </span>
+      </div>
+
+      <div class="rejilla agenda-rejilla">
+        {% for c in historial %}
+          {% with modo='proveedor' %}
+            {% include "citas/_tarjeta_cita.html" %}
+          {% endwith %}
+        {% endfor %}
+      </div>
+
     </div>
   {% endif %}
+
+</section>
+<!-- FIN AGREGADO JESUS: REDISEÑO DE MI AGENDA DEL PROFESIONAL -->
+
 {% endblock %}

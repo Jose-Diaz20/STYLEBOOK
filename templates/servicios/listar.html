@@ -1,91 +1,171 @@
-
 {% extends "base.html" %}
-{% block titulo %}Servicios · StyleBook{% endblock %}
+{% block titulo %}Catálogo de servicios · StyleBook{% endblock %}
 {% block contenido %}
   {% from "macros.html" import estrellas %}
 
-  <section>
-    <h1>Catálogo de servicios</h1>
+  <!-- INICIO AGREGADO JESUS: diseño renovado del catálogo público de servicios -->
+  <section class="servicios-pagina">
 
-    <div class="acciones" style="margin:1.1rem 0 0;flex-wrap:wrap">
-      <a class="boton{{ '' if categoria else ' boton-secundario' }}" href="{{ url_for('servicios.catalogo') }}">Todos</a>
-      {% for c in categorias if c != 'general' %}
-        <a class="boton{{ '' if categoria == c else ' boton-secundario' }}"
-           href="{{ url_for('servicios.catalogo', categoria=c) }}">{{ c|capitalize }}</a>
-      {% endfor %}
+    <div class="servicios-hero">
+      <div class="servicios-hero-texto">
+        <span class="servicios-eyebrow">STYLEBOOK · BELLEZA Y BIENESTAR</span>
+        <h1>Catálogo de servicios</h1>
+        <p>Encuentra el servicio ideal para cuidar tu estilo y sentirte increíble.</p>
+      </div>
+      <div class="servicios-hero-frase" aria-hidden="true">
+        <span>Tu estilo,</span>
+        <strong>tu momento ♡</strong>
+      </div>
     </div>
 
+    <div class="servicios-catalogo-cabecera">
+      <div>
+        <span class="servicios-linea-dorada"></span>
+        <div>
+          <h2>Explora nuestros servicios</h2>
+          <p>Opciones disponibles de profesionales verificados</p>
+        </div>
+      </div>
+      <label class="servicios-buscador" for="buscar-servicio">
+        <span aria-hidden="true">⌕</span>
+        <input id="buscar-servicio" type="search"
+               placeholder="Buscar un servicio..." autocomplete="off">
+      </label>
+    </div>
+
+    <nav class="servicios-filtros" aria-label="Filtrar servicios por categoría">
+      <a class="servicio-filtro{{ ' activo' if not categoria else '' }}"
+         href="{{ url_for('servicios.catalogo') }}">Todos</a>
+
+      {% for c in categorias if c not in ['general', 'color'] %}
+        <a class="servicio-filtro{{ ' activo' if categoria == c else '' }}"
+           href="{{ url_for('servicios.catalogo', categoria=c) }}">
+          {{ c|capitalize }}
+        </a>
+      {% endfor %}
+    </nav>
+
     {% if servicios %}
-      <div class="rejilla-tarjetas">
+      <div class="servicios-grid" id="servicios-grid">
         {% for s in servicios %}
+          <article class="servicio-card"
+            data-busqueda="{{ (s.nombre ~ ' ' ~ (s.descripcion or '') ~ ' ' ~ (s.categoria or '') ~ ' ' ~ (s.profesionales.nombre_negocio if s.profesionales else '') ~ ' ' ~ (s.profesionales.especialidad if s.profesionales else ''))|lower }}">
 
-          <div class="tarjeta">
+            <div class="servicio-card-imagen-contenedor">
+              {% if s.imagen_url %}
+                <img class="servicio-card-imagen"
+                     src="{{ s.imagen_url }}"
+                     alt="Imagen de {{ s.nombre }}"
+                     loading="lazy">
+              {% else %}
+                <div class="servicio-card-sin-imagen"
+                     aria-label="Servicio sin fotografía">STYLEBOOK</div>
+              {% endif %}
+              <span class="servicio-card-categoria">
+                {{ s.categoria|capitalize }}
+              </span>
+            </div>
 
-            <!-- INICIO AGREGADO JESUS: imagen dentro de la tarjeta del catálogo público. -->
+            <div class="servicio-card-contenido">
+              <h3>{{ s.nombre }}</h3>
 
-            {% if s.imagen_url %}
-              <img
-                  class="imagen-servicio-tarjeta"
-                  src="{{ s.imagen_url }}"
-                  alt="Imagen de {{ s.nombre }}"
-                  loading="lazy"
-              >
-            {% endif %}
-
-            <!-- FIN AGREGADO JESUS: imagen dentro de la tarjeta del catálogo público. -->
-
-            <span class="etiqueta">{{ s.categoria }}</span>
-
-            <h2>{{ s.nombre }}</h2>
-
-            <p>{{ s.descripcion or "" }}</p>
-
-            <p class="precio">${{ "%.2f"|format(s.precio) }}</p>
-
-            <p class="detalle-menor">{{ s.duracion_min }} min</p>
-
-            {% if s.profesionales %}
-              <p class="detalle-menor">
-                <a href="{{ url_for('profesionales.detalle', profesional_id=s.profesionales.id) }}">{{ s.profesionales.nombre_negocio }}</a>
-                &middot; {{ s.profesionales.especialidad }}
-
-                {% if s.profesionales.ubicacion %}
-                  <br>📍 {{ s.profesionales.ubicacion }}
-                {% endif %}
+              <p class="servicio-card-descripcion">
+                {{ s.descripcion or "Un servicio pensado para ti." }}
               </p>
 
-              <p class="detalle-menor">
+              <div class="servicio-card-calificacion">
                 {% if s.total_calificaciones %}
                   {{ estrellas(s.calificacion_promedio) }}
-                  {{ "%.1f"|format(s.calificacion_promedio) }}
-                  &middot;
-                  <a href="{{ url_for('profesionales.detalle', profesional_id=s.profesionales.id, servicio=s.id) }}#opiniones">
-                    {{ s.total_calificaciones }} {{ 'opinión' if s.total_calificaciones == 1 else 'opiniones' }}
-                  </a>
+                  <strong>{{ "%.1f"|format(s.calificacion_promedio) }}</strong>
+                  <span>
+                    ({{ s.total_calificaciones }}
+                    {{ 'opinión' if s.total_calificaciones == 1 else 'opiniones' }})
+                  </span>
                 {% else %}
-                  Aún sin opiniones
+                  <span class="servicio-sin-opiniones">Aún sin opiniones</span>
                 {% endif %}
-              </p>
+              </div>
 
-              {% if session.get('rol') == 'cliente' %}
-                <p>
-                  <a class="boton boton-secundario"
-                     href="{{ url_for('citas.reservar', profesional_id=s.profesionales.id, servicio_id=s.id) }}">
-                    Reservar
-                  </a>
-                </p>
+              <div class="servicio-card-datos">
+                <span>◷ {{ s.duracion_min }} min</span>
+                {% if s.profesionales and s.profesionales.ubicacion %}
+                  <span>⌖ {{ s.profesionales.ubicacion }}</span>
+                {% endif %}
+              </div>
+
+              {% if s.profesionales %}
+                <a class="servicio-card-profesional"
+                   href="{{ url_for('profesionales.detalle', profesional_id=s.profesionales.id) }}">
+                  {{ s.profesionales.nombre_negocio }}
+                  {% if s.profesionales.especialidad %}
+                    <span>· {{ s.profesionales.especialidad }}</span>
+                  {% endif %}
+                </a>
               {% endif %}
-            {% endif %}
 
-          </div>
+              <div class="servicio-card-pie">
+                <div class="servicio-card-precio">
+                  <small>Precio</small>
+                  <strong>${{ "{:,.0f}".format(s.precio).replace(",", ".") }}</strong>
+                </div>
 
+                {% if session.get('rol') == 'cliente' and s.profesionales %}
+                  <a class="servicio-card-reservar"
+                     href="{{ url_for('citas.reservar', profesional_id=s.profesionales.id, servicio_id=s.id) }}">
+                    Reservar <span aria-hidden="true">→</span>
+                  </a>
+                {% elif not session.get('access_token') and s.profesionales %}
+                  <a class="servicio-card-reservar"
+                     href="{{ url_for('auth.login', siguiente=url_for('citas.reservar', profesional_id=s.profesionales.id, servicio_id=s.id)) }}">
+                    Inicia sesión <span aria-hidden="true">→</span>
+                  </a>
+                {% endif %}
+              </div>
+            </div>
+          </article>
         {% endfor %}
       </div>
 
-    {% else %}
-      <p class="vacio">
-        Todavía no hay servicios cargados{{ ' en esta categoría' if categoria else '' }}.
+      <p class="servicios-sin-resultados"
+         id="servicios-sin-resultados" hidden>
+        No encontramos servicios que coincidan con tu búsqueda.
       </p>
+    {% else %}
+      <div class="servicios-vacio">
+        <span>♡</span>
+        <h3>Pronto tendremos servicios para ti</h3>
+        <p>
+          Todavía no hay servicios disponibles
+          {{ ' en esta categoría' if categoria else '' }}.
+          Vuelve a visitarnos pronto.
+        </p>
+      </div>
     {% endif %}
   </section>
+
+  <script>
+    // INICIO AGREGADO JESUS: búsqueda local en las tarjetas del catálogo.
+    document.addEventListener("DOMContentLoaded", function () {
+      const campo = document.getElementById("buscar-servicio");
+      const tarjetas = Array.from(document.querySelectorAll(".servicio-card"));
+      const mensaje = document.getElementById("servicios-sin-resultados");
+
+      if (!campo) return;
+
+      campo.addEventListener("input", function () {
+        const termino = campo.value.trim().toLocaleLowerCase("es");
+        let visibles = 0;
+
+        tarjetas.forEach(function (tarjeta) {
+          const coincide = tarjeta.dataset.busqueda.includes(termino);
+          tarjeta.hidden = !coincide;
+          if (coincide) visibles += 1;
+        });
+
+        if (mensaje) mensaje.hidden = visibles !== 0;
+      });
+    });
+    // FIN AGREGADO JESUS: búsqueda local en las tarjetas del catálogo.
+  </script>
+  <!-- FIN AGREGADO JESUS: diseño renovado del catálogo público de servicios -->
 {% endblock %}

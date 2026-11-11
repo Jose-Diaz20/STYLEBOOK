@@ -1,53 +1,190 @@
+
 {% extends "base.html" %}
 {% block titulo %}Mi horario de atención · StyleBook{% endblock %}
-{% block contenido %}
-<section class="horarios-semana">
-  <h1>Mi horario de atención</h1>
-  <p>Configura toda tu semana. Puedes activar los días que atiendes y definir una pausa o almuerzo. Las citas deben caber completamente dentro de una franja de atención y nunca se ofrecerán durante la pausa.</p>
 
-  <form method="post" action="{{ url_for('horarios.guardar_semana') }}" class="formulario">
-    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}" />
-    {% for dia in dias %}
-      {% set h = por_dia.get(loop.index0) %}
-      <fieldset class="horario-dia">
-        <legend>{{ dia }}</legend>
-        <label class="horario-activo">
-          <input type="checkbox" name="activo_{{ loop.index0 }}" {% if h %}checked{% endif %}>
-          Atiendo este día
-        </label>
-        <div class="campos-horario">
-          <label>Desde
-            <input type="time" name="hora_inicio_{{ loop.index0 }}" value="{{ h.hora_inicio[:5] if h else '08:00' }}">
-          </label>
-          <label>Hasta
-            <input type="time" name="hora_fin_{{ loop.index0 }}" value="{{ h.hora_fin[:5] if h else '17:00' }}">
-          </label>
-          <label>Inicio de pausa (opcional)
-            <input type="time" name="pausa_inicio_{{ loop.index0 }}" value="{{ h.pausa_inicio[:5] if h and h.get('pausa_inicio') else '' }}">
-          </label>
-          <label>Fin de pausa (opcional)
-            <input type="time" name="pausa_fin_{{ loop.index0 }}" value="{{ h.pausa_fin[:5] if h and h.get('pausa_fin') else '' }}">
-          </label>
-        </div>
-      </fieldset>
-    {% endfor %}
-    <button type="submit">Guardar horario semanal</button>
+{% block contenido %}
+
+<!-- INICIO AGREGADO JESUS: REDISEÑO DE MI HORARIO -->
+
+<section class="horarios-semana horarios-profesional">
+
+  <div class="horarios-encabezado">
+    <div>
+      <span class="horarios-subtitulo">STYLEBOOK · ESPACIO PROFESIONAL</span>
+      <h1>Mi horario de atención</h1>
+      <p>Organiza tus días de trabajo y define cuándo pueden reservar tus clientes.</p>
+    </div>
+
+    <div class="horarios-icono">◷</div>
+  </div>
+
+  <div class="horarios-informacion">
+    <span class="horarios-info-icono">i</span>
+    <p>
+      Configura los días que atiendes, tus horas de inicio y finalización,
+      y las pausas o almuerzos. Las citas deben caber completamente dentro
+      de una franja de atención y nunca se ofrecerán durante la pausa.
+    </p>
+  </div>
+
+  <form method="post"
+        action="{{ url_for('horarios.guardar_semana') }}"
+        class="formulario horarios-formulario">
+
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+
+    <div class="horarios-titulo-formulario">
+      <div>
+        <span class="horarios-etiqueta">CONFIGURACIÓN SEMANAL</span>
+        <h2>Disponibilidad por día</h2>
+        <p>Activa los días en los que deseas recibir reservas.</p>
+      </div>
+      <span class="horarios-total-dias">{{ dias|length }} días</span>
+    </div>
+
+    <div class="horarios-lista">
+
+      {% for dia in dias %}
+        {% set h = por_dia.get(loop.index0) %}
+
+        <fieldset class="horario-dia">
+
+          <div class="horario-dia-encabezado">
+            <legend>{{ dia }}</legend>
+
+            <label class="horario-activo">
+              <input
+                type="checkbox"
+                name="activo_{{ loop.index0 }}"
+                {% if h %}checked{% endif %}
+              >
+              <span>Atiendo este día</span>
+            </label>
+          </div>
+
+          <div class="campos-horario">
+
+            <label class="campo-horario">
+              <span>Hora de inicio</span>
+              <input
+                type="time"
+                name="hora_inicio_{{ loop.index0 }}"
+                value="{{ h.hora_inicio[:5] if h else '08:00' }}"
+              >
+            </label>
+
+            <label class="campo-horario">
+              <span>Hora de finalización</span>
+              <input
+                type="time"
+                name="hora_fin_{{ loop.index0 }}"
+                value="{{ h.hora_fin[:5] if h else '17:00' }}"
+              >
+            </label>
+
+            <label class="campo-horario">
+              <span>Inicio de pausa</span>
+              <input
+                type="time"
+                name="pausa_inicio_{{ loop.index0 }}"
+                value="{{ h.pausa_inicio[:5] if h and h.get('pausa_inicio') else '' }}"
+              >
+            </label>
+
+            <label class="campo-horario">
+              <span>Fin de pausa</span>
+              <input
+                type="time"
+                name="pausa_fin_{{ loop.index0 }}"
+                value="{{ h.pausa_fin[:5] if h and h.get('pausa_fin') else '' }}"
+              >
+            </label>
+
+          </div>
+
+          <p class="horario-ayuda">
+            Puedes dejar la pausa vacía si trabajas durante toda la jornada.
+          </p>
+
+        </fieldset>
+
+      {% endfor %}
+
+    </div>
+
+    <div class="horarios-guardar">
+      <div>
+        <strong>¿Terminaste de configurar tu semana?</strong>
+        <p>Guarda los cambios para actualizar tu disponibilidad.</p>
+      </div>
+
+      <button type="submit" class="horarios-boton-guardar">
+        <span>✓</span> Guardar horario semanal
+      </button>
+    </div>
+
   </form>
 
-  {% if horarios %}
-    <h2>Horario guardado</h2>
-    <ul class="lista-servicios">
-      {% for h in horarios %}
-        <li>
-          <strong>{{ dias[h.dia_semana] }}</strong>: {{ h.hora_inicio[:5] }} – {{ h.hora_fin[:5] }}
-          {% if h.get('pausa_inicio') and h.get('pausa_fin') %}
-            · Pausa {{ h.pausa_inicio[:5] }} – {{ h.pausa_fin[:5] }}
-          {% endif %}
-        </li>
-      {% endfor %}
-    </ul>
-  {% else %}
-    <p>Todavía no has definido tu horario de atención.</p>
-  {% endif %}
+  <div class="horarios-guardados">
+
+    <div class="horarios-titulo-formulario">
+      <div>
+        <span class="horarios-etiqueta">TU DISPONIBILIDAD</span>
+        <h2>Horario guardado</h2>
+        <p>Así está configurada actualmente tu semana.</p>
+      </div>
+    </div>
+
+    {% if horarios %}
+
+      <div class="horarios-guardados-lista">
+
+        {% for h in horarios %}
+
+          <article class="horario-guardado-card">
+            <div class="horario-guardado-dia">
+              <span>✓</span>
+              <strong>{{ dias[h.dia_semana] }}</strong>
+            </div>
+
+            <div class="horario-guardado-detalles">
+              <div>
+                <span>Atención</span>
+                <strong>{{ h.hora_inicio[:5] }} – {{ h.hora_fin[:5] }}</strong>
+              </div>
+
+              {% if h.get('pausa_inicio') and h.get('pausa_fin') %}
+                <div>
+                  <span>Pausa</span>
+                  <strong>{{ h.pausa_inicio[:5] }} – {{ h.pausa_fin[:5] }}</strong>
+                </div>
+              {% else %}
+                <div>
+                  <span>Pausa</span>
+                  <strong>Sin pausa configurada</strong>
+                </div>
+              {% endif %}
+            </div>
+          </article>
+
+        {% endfor %}
+
+      </div>
+
+    {% else %}
+
+      <div class="horarios-vacio">
+        <div>◷</div>
+        <h3>Aún no tienes horarios guardados</h3>
+        <p>Configura tus días y horas de atención para comenzar a organizar tus reservas.</p>
+      </div>
+
+    {% endif %}
+
+  </div>
+
 </section>
+
+<!-- FIN AGREGADO JESUS: REDISEÑO DE MI HORARIO -->
+
 {% endblock %}

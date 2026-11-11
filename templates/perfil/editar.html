@@ -1,18 +1,99 @@
+
 {% extends "base.html" %}
 {% block titulo %}Editar perfil · StyleBook{% endblock %}
 {% block contenido %}
-  <section class="formulario-angosto">
-    <h1>Editar perfil</h1>
-    <form method="POST">
-      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}" />
-      <label for="nombre">Nombre completo</label>
-      <input type="text" id="nombre" name="nombre" maxlength="100" value="{{ perfil.nombre }}" required />
 
-      <label for="telefono">Teléfono</label>
-      <input type="tel" id="telefono" name="telefono" maxlength="20" value="{{ perfil.telefono or '' }}" />
+<!-- INICIO AGREGADO JESUS: Página de edición de perfil -->
+<section class="editar-perfil-pagina">
 
-      <button type="submit" class="boton">Guardar cambios</button>
-    </form>
-    <p><a href="{{ url_for('perfil.ver') }}">Volver a mi perfil</a></p>
-  </section>
+  <div class="editar-perfil-hero">
+    <div>
+      <span class="editar-perfil-eyebrow">STYLEBOOK · MI CUENTA</span>
+      <h1>Editar perfil</h1>
+      <p>Actualiza tus datos personales y mantén tu información al día.</p>
+    </div>
+
+    <div class="editar-perfil-hero-icono">✦</div>
+  </div>
+
+  <div class="editar-perfil-contenedor">
+
+    <div class="editar-perfil-card">
+
+      <div class="editar-perfil-titulo">
+        <div class="editar-perfil-icono">♙</div>
+        <div>
+          <h2>Información personal</h2>
+          <p>Modifica los datos asociados a tu cuenta.</p>
+        </div>
+      </div>
+
+      <form method="POST" class="editar-perfil-formulario">
+
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}" />
+
+        <div class="editar-perfil-avatar">
+          <span>{{ perfil.nombre[0]|upper }}</span>
+          <div>
+            <strong>{{ perfil.nombre }}</strong>
+            <small>Tu perfil en StyleBook</small>
+          </div>
+        </div>
+
+        <div class="editar-perfil-campo">
+          <label for="nombre">Nombre completo</label>
+          <input
+            type="text"
+            id="nombre"
+            name="nombre"
+            maxlength="100"
+            value="{{ perfil.nombre }}"
+            placeholder="Escribe tu nombre completo"
+            required
+          />
+        </div>
+
+        <div class="editar-perfil-campo">
+          <label for="telefono">Teléfono</label>
+          <input
+            type="tel"
+            id="telefono"
+            name="telefono"
+            maxlength="20"
+            value="{{ perfil.telefono or '' }}"
+            placeholder="Escribe tu número de teléfono"
+          />
+          <small>Este dato permite mantener actualizada tu información de contacto.</small>
+        </div>
+
+        <div class="editar-perfil-acciones">
+          <a href="{{ url_for('perfil.ver') }}" class="editar-perfil-volver">
+            Cancelar
+          </a>
+
+          <button type="submit" class="editar-perfil-guardar">
+            Guardar cambios <span>→</span>
+          </button>
+        </div>
+
+      </form>
+
+    </div>
+
+    <div class="editar-perfil-consejo">
+      <span>✧</span>
+      <div>
+        <strong>Mantén tus datos actualizados</strong>
+        <p>
+          Verifica que tu nombre y teléfono estén correctamente escritos
+          para que tu información personal se mantenga actualizada.
+        </p>
+      </div>
+    </div>
+
+  </div>
+
+</section>
+<!-- FIN AGREGADO JESUS: Página de edición de perfil -->
+
 {% endblock %}
