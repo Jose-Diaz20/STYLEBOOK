@@ -1,6 +1,52 @@
-
 {% extends "base.html" %}
+
 {% block titulo %}Panel de administrador · StyleBook{% endblock %}
+
+{# Servicios de un proveedor, con su foto y el botón para eliminarlos #}
+{% macro servicios_del_proveedor(p) %}
+  {% if p.servicios %}
+    <div class="rejilla-admin">
+      {% for s in p.servicios %}
+        <article class="servicio-admin {{ '' if s.activo else 'inactivo' }}">
+          {% if s.imagen_url %}
+            <a href="{{ s.imagen_url }}" target="_blank" rel="noopener" title="Ver foto completa">
+              <img class="imagen-servicio-admin" src="{{ s.imagen_url }}"
+                   alt="Foto de {{ s.nombre }}" loading="lazy">
+            </a>
+          {% else %}
+            <div class="imagen-servicio-admin sin-foto">Sin foto</div>
+          {% endif %}
+
+          <div class="servicio-admin-cuerpo">
+            <span class="etiqueta">{{ s.categoria }}</span>
+            {% if not s.activo %}
+              <span class="etiqueta estado-cancelada">Desactivado</span>
+            {% endif %}
+
+            <h4>{{ s.nombre }}</h4>
+            <p>{{ s.descripcion or "Sin descripción" }}</p>
+
+            <p class="precio">
+              ${{ "%.2f"|format(s.precio) }}
+              <span class="detalle-menor">&middot; {{ s.duracion_min }} min</span>
+            </p>
+
+            <button type="button"
+                    class="boton boton-peligro boton-chico js-eliminar-servicio"
+                    data-url="{{ url_for('admin.eliminar_servicio', servicio_id=s.id) }}"
+                    data-servicio="{{ s.nombre }}"
+                    data-proveedor="{{ p.nombre_negocio }}">
+              Eliminar servicio
+            </button>
+          </div>
+        </article>
+      {% endfor %}
+    </div>
+  {% else %}
+    <p class="vacio">Todavía no ha publicado servicios.</p>
+  {% endif %}
+{% endmacro %}
+
 {% block contenido %}
 
 <!-- INICIO AGREGADO JESUS: Panel principal de administrador -->
@@ -13,13 +59,11 @@
       <h1>Panel de administrador</h1>
       <p>Gestiona las solicitudes y supervisa la actividad de la plataforma.</p>
     </div>
-
     <div class="admin-hero-icono">✦</div>
   </div>
 
   <!-- Indicadores -->
   <div class="admin-estadisticas">
-
     <div class="admin-estadistica">
       <div class="admin-estadistica-icono">✓</div>
       <div>
@@ -46,12 +90,10 @@
         <small>Por revisar</small>
       </div>
     </div>
-
   </div>
 
-  <!-- Solicitudes -->
+  <!-- Solicitudes pendientes -->
   <div class="admin-seccion">
-
     <div class="admin-seccion-encabezado">
       <div>
         <span class="admin-seccion-etiqueta">GESTIÓN DE REGISTROS</span>
@@ -67,7 +109,6 @@
 
     {% if pendientes %}
       <div class="admin-solicitudes">
-
         {% for p in pendientes %}
           <article class="admin-solicitud">
 
@@ -113,43 +154,176 @@
               {% endif %}
             </div>
 
-            <div class="admin-solicitud-acciones">
+            <!-- INICIO AGREGADO JESUS: Consulta de servicios de solicitudes pendientes -->
+            {% if p.servicios %}
+              <details class="detalle-servicios">
+                <summary>Ver sus servicios ({{ p.servicios|length }})</summary>
+                {{ servicios_del_proveedor(p) }}
+              </details>
+            {% endif %}
+            <!-- FIN AGREGADO JESUS: Consulta de servicios de solicitudes pendientes -->
 
-              <form action="{{ url_for('admin.aprobar', profesional_id=p.id) }}" method="post">
-                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}" />
+            <div class="admin-solicitud-acciones">
+              <form action="{{ url_for('admin.aprobar', profesional_id=p.id) }}"
+                    method="post">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                 <button type="submit" class="admin-boton-aprobar">
                   <span>✓</span> Aprobar solicitud
                 </button>
               </form>
 
-              <form action="{{ url_for('admin.rechazar', profesional_id=p.id) }}" method="post">
-                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}" />
+              <form action="{{ url_for('admin.rechazar', profesional_id=p.id) }}"
+                    method="post">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                 <button type="submit" class="admin-boton-rechazar">
                   Rechazar
                 </button>
               </form>
-
             </div>
 
           </article>
         {% endfor %}
-
       </div>
-
     {% else %}
-
       <div class="admin-sin-solicitudes">
         <div class="admin-sin-solicitudes-icono">✓</div>
         <h3>¡Todo está al día!</h3>
         <p>No hay solicitudes pendientes por revisar.</p>
         <span>Las nuevas solicitudes aparecerán aquí.</span>
       </div>
-
     {% endif %}
-
   </div>
 
 </section>
 <!-- FIN AGREGADO JESUS: Panel principal de administrador -->
+
+<!-- Profesionales registrados -->
+<h2 style="margin-top:2.2rem">Profesionales registrados y sus servicios</h2>
+
+{% if registrados %}
+  <div class="lista-proveedores">
+    {% for p in registrados %}
+      <details class="proveedor-admin"
+               id="prov-{{ p.id }}"
+               {% if request.args.get('abrir') == p.id|string %}open{% endif %}>
+
+        <summary>
+          <span class="proveedor-nombre">{{ p.nombre_negocio }}</span>
+
+          <span class="detalle-menor">
+            {{ "Establecimiento" if p.tipo_proveedor == 'establecimiento' else "Profesional independiente" }}
+            &middot; {{ p.especialidad }}
+          </span>
+
+          {% if p.estado == 'rechazado' %}
+            <span class="etiqueta estado-cancelada">Rechazado</span>
+          {% elif p.activo == false %}
+            <span class="etiqueta estado-pendiente">Inactivo</span>
+          {% else %}
+            <span class="etiqueta estado-confirmada">Aprobado</span>
+          {% endif %}
+
+          <span class="etiqueta">
+            {{ p.servicios|length }}
+            {{ 'servicio' if p.servicios|length == 1 else 'servicios' }}
+          </span>
+        </summary>
+
+        <p class="detalle-menor" style="margin:.2rem 0 .8rem">
+          {% if p.ubicacion %}📍 {{ p.ubicacion }}{% endif %}
+          {% if p.telefono %} &middot; ☎ {{ p.telefono }}{% endif %}
+        </p>
+
+        {{ servicios_del_proveedor(p) }}
+      </details>
+    {% endfor %}
+  </div>
+{% else %}
+  <p class="vacio">Aún no hay profesionales registrados.</p>
+{% endif %}
+
+<!-- INICIO AGREGADO JESUS: Ventana para eliminar servicios con motivo -->
+<dialog id="dialogo-eliminar" class="dialogo">
+  <form method="post" id="form-eliminar">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+
+    <h3>Eliminar servicio</h3>
+
+    <p>
+      Vas a eliminar <strong id="eliminar-servicio"></strong> de
+      <strong id="eliminar-proveedor"></strong>.
+    </p>
+
+    <label for="motivo">¿Por qué lo eliminas? *</label>
+
+    <textarea id="motivo" name="motivo" required minlength="10" maxlength="500"
+              placeholder="Escribe una justificación clara. Ej.: La imagen no corresponde al servicio."></textarea>
+
+    <div class="chips" aria-label="Motivos frecuentes">
+      <button type="button" class="chip js-motivo">Subido por error</button>
+      <button type="button" class="chip js-motivo">Imagen o contenido inapropiado</button>
+      <button type="button" class="chip js-motivo">Información falsa o engañosa</button>
+    </div>
+
+    <p class="detalle-menor">
+      El profesional recibirá este motivo como notificación. Si el servicio ya tiene citas,
+      se retira del catálogo (el historial de los clientes se conserva) y las citas futuras
+      se cancelan avisando a los clientes.
+    </p>
+
+    <div class="acciones" style="justify-content:flex-end">
+      <button type="button" class="boton boton-secundario"
+              id="cancelar-eliminar">Cancelar</button>
+      <button type="submit" class="boton boton-peligro">
+        Eliminar definitivamente
+      </button>
+    </div>
+  </form>
+</dialog>
+<!-- FIN AGREGADO JESUS: Ventana para eliminar servicios con motivo -->
+
+<!-- INICIO AGREGADO JESUS: JavaScript para gestionar eliminación de servicios -->
+<script>
+  (function () {
+    var dialogo = document.getElementById("dialogo-eliminar");
+    var formulario = document.getElementById("form-eliminar");
+    var motivo = document.getElementById("motivo");
+
+    document.querySelectorAll(".js-eliminar-servicio").forEach(function (boton) {
+      boton.addEventListener("click", function () {
+        formulario.action = boton.dataset.url;
+
+        document.getElementById("eliminar-servicio").textContent =
+          boton.dataset.servicio;
+
+        document.getElementById("eliminar-proveedor").textContent =
+          boton.dataset.proveedor;
+
+        motivo.value = "";
+        dialogo.showModal();
+        motivo.focus();
+      });
+    });
+
+    document.querySelectorAll(".js-motivo").forEach(function (chip) {
+      chip.addEventListener("click", function () {
+        motivo.value = chip.textContent;
+        motivo.focus();
+      });
+    });
+
+    document.getElementById("cancelar-eliminar").addEventListener("click", function () {
+      dialogo.close();
+    });
+
+    // Clic fuera de la caja = cancelar.
+    dialogo.addEventListener("click", function (e) {
+      if (e.target === dialogo) {
+        dialogo.close();
+      }
+    });
+  })();
+</script>
+<!-- FIN AGREGADO JESUS: JavaScript para gestionar eliminación de servicios -->
 
 {% endblock %}
