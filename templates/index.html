@@ -3,324 +3,39 @@
 {% block contenido %}
 {% from "macros.html" import estrellas %}
 
-<!-- INICIO AGREGADO JESUS: nueva página principal de StyleBook. -->
-
 {% set rol = session.get('rol') %}
 
-<!-- BANNER PRINCIPAL -->
-<section class="inicio-banner">
+<!-- PORTADA -->
+<section class="portada">
+  <div class="portada-marco">
 
-    <div class="inicio-banner-contenido">
-        <span class="inicio-etiqueta">STYLEBOOK · BELLEZA Y CUIDADO PERSONAL</span>
+    <h1 class="portada-titulo">Cuida tu estilo</h1>
 
-        <h1>
-            Belleza y estilo
-            <br>
-            en <em>un solo lugar</em>
-        </h1>
+    <div class="portada-cuerpo">
 
+      <div class="portada-texto">
         <p>
-            Reserva los mejores servicios de belleza y cuidado personal
-            con profesionales de confianza.
+          Reserva servicios de belleza y cuidado personal
+          con profesionales de confianza.
         </p>
+        <div class="portada-acciones">
+          <a class="boton-principal" href="{{ url_for('servicios.catalogo') }}">Explorar servicios</a>
+          <a class="boton-contorno" href="{{ url_for('profesionales.listar') }}">Explorar profesionales</a>
+        </div>
+      </div>
 
-        <a class="inicio-boton-dorado"
-           href="{{ url_for('servicios.catalogo') }}">
-            Explorar servicios <span>→</span>
-        </a>
+      <figure class="portada-arco">
+        <img src="{{ url_for('static', filename='css/img/hero-modelo.jpg') }}"
+             alt="Mujer con cabello ondulado castaño y aretes dorados">
+      </figure>
+
+      <p class="portada-nota">
+        Cada profesional es aprobado por StyleBook antes de publicar sus servicios.
+      </p>
+
     </div>
-
-    <div class="inicio-banner-frase">
-        <span>Tu belleza,</span>
-        <span>nuestra prioridad</span>
-        <strong>♡</strong>
-    </div>
-
+  </div>
 </section>
 
-
-
-<!-- INICIO AGREGADO JESUS: categorías de la página principal. -->
-
-<section class="inicio-categorias">
-
-    <a class="categoria-inicio categoria-activa"
-       href="{{ url_for('servicios.catalogo') }}">
-        <span>▦</span> Todos
-    </a>
-
-    <a class="categoria-inicio"
-       href="{{ url_for('servicios.catalogo', categoria='cortes') }}">
-        <span>✂</span> Cortes
-    </a>
-
-    <a class="categoria-inicio"
-       href="{{ url_for('servicios.catalogo', categoria='barbería') }}">
-        <span>♟</span> Barbería
-    </a>
-
-    <a class="categoria-inicio"
-       href="{{ url_for('servicios.catalogo', categoria='uñas') }}">
-        <span>♧</span> Uñas
-    </a>
-
-    <a class="categoria-inicio"
-       href="{{ url_for('servicios.catalogo', categoria='spa') }}">
-        <span>✿</span> Spa
-    </a>
-
-    <a class="categoria-inicio"
-       href="{{ url_for('servicios.catalogo', categoria='maquillaje') }}">
-        <span>✦</span> Maquillaje
-    </a>
-
-</section>
-
-<!-- FIN AGREGADO JESUS: categorías de la página principal. -->
- 
-
-<!-- ENCABEZADO DEL CATÁLOGO -->
-<section class="inicio-catalogo">
-
-    <div class="inicio-catalogo-encabezado">
-
-        <div>
-            <span class="inicio-linea-dorada"></span>
-            <h2>Catálogo de servicios</h2>
-        </div>
-
-        <div class="inicio-buscador">
-            <span>⌕</span>
-            <input
-                type="search"
-                id="buscarServicioInicio"
-                placeholder="Buscar servicios..."
-                aria-label="Buscar servicios"
-            >
-        </div>
-
-    </div>
-
-
-    <!-- SERVICIOS Y PANEL PROMOCIONAL -->
-    <div class="inicio-contenedor-catalogo">
-
-        <div class="inicio-servicios" id="contenedorServiciosInicio">
-
-            {% if servicios %}
-
-                {% for s in servicios %}
-
-                    <article class="inicio-tarjeta-servicio"
-                             data-busqueda="{{ (s.nombre ~ ' ' ~ s.categoria ~ ' ' ~ (s.descripcion or ''))|lower }}">
-
-                        {% if s.imagen_url %}
-                            <img
-                                class="inicio-imagen-servicio"
-                                src="{{ s.imagen_url }}"
-                                alt="Imagen de {{ s.nombre }}"
-                                loading="lazy"
-                            >
-                        {% else %}
-                            <div class="inicio-imagen-sin-foto">
-                                <span>StyleBook</span>
-                            </div>
-                        {% endif %}
-
-                        <div class="inicio-contenido-tarjeta">
-
-                            <span class="inicio-etiqueta-servicio">
-                                {{ s.categoria|capitalize }}
-                            </span>
-
-                            <h3>{{ s.nombre }}</h3>
-
-                            <p class="inicio-descripcion">
-                                {{ s.descripcion or "Descubre este servicio de belleza y cuidado personal." }}
-                            </p>
-
-                            <div class="inicio-datos-servicio">
-
-                                <span>
-                                    <strong>$</strong>
-                                    ${{ "{:,.0f}".format(s.precio).replace(",", ".") }}
-                                </span>
-
-                                <span>
-                                    ◷ {{ s.duracion_min }} min
-                                </span>
-
-                            </div>
-
-                            <div class="inicio-calificacion">
-
-                                {% if s.total_calificaciones %}
-                                    {{ estrellas(s.calificacion_promedio) }}
-                                    <strong>
-                                        {{ "%.1f"|format(s.calificacion_promedio) }}
-                                    </strong>
-                                    <small>
-                                        ({{ s.total_calificaciones }} opiniones)
-                                    </small>
-                                {% else %}
-                                    <small>Sin opiniones todavía</small>
-                                {% endif %}
-
-                            </div>
-
-                            <div class="inicio-profesional">
-                                {{ s.profesionales.nombre_negocio }}
-                            </div>
-
-                            {% if rol == 'cliente' %}
-
-                                <a class="inicio-boton-reservar"
-                                   href="{{ url_for('citas.reservar',
-                                       profesional_id=s.profesionales.id,
-                                       servicio_id=s.id) }}">
-                                    <span>▦</span> Reservar
-                                </a>
-
-                            {% elif rol in ['profesional', 'establecimiento'] %}
-
-                                <a class="inicio-boton-reservar"
-                                   href="{{ url_for('servicios.catalogo') }}">
-                                    Ver catálogo
-                                </a>
-
-                            {% else %}
-
-                                <a class="inicio-boton-reservar"
-                                   href="{{ url_for('auth.login') }}">
-                                    Iniciar sesión para reservar
-                                </a>
-
-                            {% endif %}
-
-                        </div>
-
-                    </article>
-
-                {% endfor %}
-
-            {% else %}
-
-                <div class="inicio-sin-servicios">
-                    <h3>Próximamente nuevos servicios</h3>
-                    <p>
-                        Estamos preparando nuestro catálogo para que
-                        encuentres los mejores servicios de belleza.
-                    </p>
-                    <a href="{{ url_for('profesionales.listar') }}">
-                        Conocer profesionales
-                    </a>
-                </div>
-
-            {% endif %}
-
-            <p id="sinResultadosInicio" class="inicio-sin-resultados" hidden>
-                No encontramos servicios que coincidan con tu búsqueda.
-            </p>
-
-        </div>
-
-
-        <!-- PANEL LATERAL -->
-        <aside class="inicio-panel-promocional">
-
-            <div class="inicio-panel-logo">
-                <span>✿</span>
-                <h2>Style<span>Book</span></h2>
-            </div>
-
-            <p class="inicio-panel-frase">
-                Tu belleza,
-                <br>
-                nuestra prioridad
-            </p>
-
-            <ul>
-                <li>✓ Profesionales registrados</li>
-                <li>✓ Reservas fáciles y rápidas</li>
-                <li>✓ Servicios de belleza</li>
-            </ul>
-
-            {% if rol == 'cliente' %}
-
-                <a href="{{ url_for('profesionales.listar') }}"
-                   class="inicio-boton-dorado">
-                    Conocer profesionales →
-                </a>
-
-            {% elif rol in ['profesional', 'establecimiento'] %}
-
-                <a href="{{ url_for('servicios.gestionar') }}"
-                   class="inicio-boton-dorado">
-                    Administrar servicios →
-                </a>
-
-            {% elif rol == 'admin' %}
-
-                <a href="{{ url_for('admin.panel') }}"
-                   class="inicio-boton-dorado">
-                    Panel administrador →
-                </a>
-
-            {% else %}
-
-                <a href="{{ url_for('auth.registro') }}"
-                   class="inicio-boton-dorado">
-                    Únete ahora →
-                </a>
-
-            {% endif %}
-
-        </aside>
-
-    </div>
-
-</section>
-
-
-<!-- BUSCADOR DE SERVICIOS DE LA PORTADA -->
-<script>
-// INICIO AGREGADO JESUS: buscador local de servicios de la portada.
-
-document.addEventListener("DOMContentLoaded", function () {
-
-    const buscador = document.getElementById("buscarServicioInicio");
-    const tarjetas = document.querySelectorAll(".inicio-tarjeta-servicio");
-    const mensaje = document.getElementById("sinResultadosInicio");
-
-    if (!buscador) return;
-
-    buscador.addEventListener("input", function () {
-
-        const texto = this.value.toLowerCase().trim();
-        let visibles = 0;
-
-        tarjetas.forEach(function (tarjeta) {
-
-            const contenido = tarjeta.dataset.busqueda || "";
-            const coincide = contenido.includes(texto);
-
-            tarjeta.style.display = coincide ? "" : "none";
-
-            if (coincide) visibles++;
-
-        });
-
-        if (mensaje) {
-            mensaje.hidden = visibles !== 0;
-        }
-
-    });
-
-});
-
-// FIN AGREGADO JESUS: buscador local de servicios de la portada.
-</script>
-
-<!-- FIN AGREGADO JESUS: nueva página principal de StyleBook. -->
 
 {% endblock %}

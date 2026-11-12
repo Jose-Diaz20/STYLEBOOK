@@ -6,8 +6,9 @@
   <title>{% block titulo %}StyleBook{% endblock %}</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@700;800&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700&family=Playfair+Display:ital,wght@0,400;0,500;0,600;0,700;1,400&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="{{ url_for('static', filename='css/estilos.css') }}" />
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/tema.css') }}" />
 </head>
 <!-- INICIO AGREGADO JESUS: identificar la página principal. -->
 <body class="{% if request.endpoint == 'index' %}pagina-inicio{% endif %}">
@@ -23,7 +24,13 @@
     <!-- FIN AGREGADO JESUS: logo StyleBook. -->
 
 
-    <nav class="menu">
+    <button class="menu-boton" type="button" aria-expanded="false" aria-controls="menu-principal" aria-label="Abrir menú">
+      <svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" aria-hidden="true">
+        <path d="M4 7h16M4 12h16M4 17h16"/>
+      </svg>
+    </button>
+
+    <nav class="menu" id="menu-principal">
       {# Menú según el tipo de cuenta: el catálogo es de clientes y visitantes; el proveedor ve solo su panel #}
       {% set es_proveedor = rol in ['establecimiento', 'profesional'] %}
       {% if not es_proveedor and rol != 'admin' %}
@@ -56,7 +63,7 @@
         <a href="{{ url_for('auth.logout') }}">Cerrar sesión</a>
       {% else %}
         <a href="{{ url_for('auth.login') }}">Iniciar sesión</a>
-        <a href="{{ url_for('auth.registro') }}">Registrarme</a>
+        <a href="{{ url_for('auth.registro') }}" class="menu-cta">Registrarme</a>
       {% endif %}
     </nav>
   </header>
@@ -76,7 +83,53 @@
   </main>
 
   <footer class="pie">
-    <p>StyleBook &middot; Sprint 1</p>
+    <div class="pie-contenido">
+      <div class="pie-marca">
+        <p class="pie-logo">Style<span>Book</span></p>
+        <p class="pie-frase">Cuida tu estilo.</p>
+      </div>
+
+      {% if not es_proveedor and rol != 'admin' %}
+      <div class="pie-columna">
+        <h2>Explorar</h2>
+        <a href="{{ url_for('servicios.catalogo') }}">Servicios</a>
+        <a href="{{ url_for('profesionales.listar') }}">Profesionales</a>
+      </div>
+      {% endif %}
+
+      <div class="pie-columna">
+        <h2>Tu cuenta</h2>
+        {% if session.get('access_token') %}
+          {% if rol == 'cliente' %}
+            <a href="{{ url_for('citas.mis_citas') }}">Mis citas</a>
+          {% elif es_proveedor %}
+            <a href="{{ url_for('citas.agenda') }}">Mi agenda</a>
+            <a href="{{ url_for('servicios.gestionar') }}">Mis servicios</a>
+          {% elif rol == 'admin' %}
+            <a href="{{ url_for('admin.panel') }}">Panel admin</a>
+          {% endif %}
+          <a href="{{ url_for('perfil.ver') }}">Mi perfil</a>
+          <a href="{{ url_for('auth.logout') }}">Cerrar sesión</a>
+        {% else %}
+          <a href="{{ url_for('auth.login') }}">Iniciar sesión</a>
+          <a href="{{ url_for('auth.registro') }}">Registrarme</a>
+        {% endif %}
+      </div>
+    </div>
+    <p class="pie-base">StyleBook &middot; Sprint 1</p>
   </footer>
+
+  <script>
+    (function () {
+      var barra = document.querySelector(".barra");
+      var boton = document.querySelector(".menu-boton");
+      if (!barra || !boton) return;
+      boton.addEventListener("click", function () {
+        var abierto = barra.classList.toggle("menu-abierto");
+        boton.setAttribute("aria-expanded", abierto ? "true" : "false");
+        boton.setAttribute("aria-label", abierto ? "Cerrar menú" : "Abrir menú");
+      });
+    })();
+  </script>
 </body>
 </html>
