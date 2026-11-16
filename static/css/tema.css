@@ -73,7 +73,7 @@ h1, h2, h3, .display {
 .barra .logo-stylebook-imagen {
   width: 132px;
   height: 68px;
-  background-image: url("/static/css/img/logo-stylebook-recortado.png");
+  background-image: url("img/logo-stylebook-recortado.png");
   background-position: left center;
 }
 
@@ -619,4 +619,58 @@ body.pagina-inicio .pie-base { margin: 0 auto; padding-top: 0; border-top: 0; }
 @media (min-width: 821px) {
   .portada-acciones { flex-wrap: nowrap; }
   .portada-acciones a { padding: .8rem 1.25rem; white-space: nowrap; }
+}
+
+/* ---------- usuario en el encabezado: nombre y tipo de cuenta ---------- */
+.menu a.icono-notif {
+  background: transparent;
+  box-shadow: none;
+  border-radius: var(--r-pastilla);
+}
+.menu a.icono-notif:hover { background: var(--arena-clara); color: var(--espresso); }
+
+.menu .menu-usuario {
+  display: inline-flex;
+  align-items: center;
+  gap: .65rem;
+  padding-left: 1.5rem;
+  margin-left: .25rem;
+  border-left: 1px solid var(--linea);
+  line-height: 1.2;
+}
+.menu .menu-usuario::after { display: none; }
+
+.menu-usuario-inicial {
+  display: grid;
+  place-items: center;
+  width: 36px; height: 36px;
+  flex: none;
+  border-radius: 50%;
+  background: var(--arena);
+  color: var(--espresso);
+  font-family: "Playfair Display", Georgia, serif;
+  font-size: 1.05rem;
+  font-weight: 500;
+}
+
+.menu-usuario-texto { display: flex; flex-direction: column; min-width: 0; }
+.menu-usuario-texto strong {
+  max-width: 11rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: .94rem;
+  font-weight: 600;
+  color: var(--espresso);
+}
+.menu-usuario-texto small { font-size: .78rem; color: var(--tinta-suave); }
+
+.menu .menu-usuario:hover .menu-usuario-texto strong { color: var(--camel-oscuro); }
+
+.menu .menu-salir { font-size: .88rem; color: var(--tinta-suave); }
+.menu .menu-salir:hover { color: var(--espresso); }
+
+@media (max-width: 900px) {
+  .menu .menu-usuario { padding: .85rem 0; margin: 0; border-left: 0; border-bottom: 1px solid var(--linea); }
+  .menu-usuario-texto strong { max-width: none; }
 }

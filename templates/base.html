@@ -59,8 +59,16 @@
             </svg>{% if pendientes %}<span class="globito">{{ pendientes }}</span>{% endif %}
           </a>
         {% endif %}
-        <a href="{{ url_for('perfil.ver') }}">Mi perfil</a>
-        <a href="{{ url_for('auth.logout') }}">Cerrar sesión</a>
+        {% set etiquetas_rol = {'cliente': 'Cliente', 'profesional': 'Profesional', 'establecimiento': 'Establecimiento', 'admin': 'Administrador'} %}
+        {% set nombre_usuario = session.get('nombre') or 'Mi cuenta' %}
+        <a href="{{ url_for('perfil.ver') }}" class="menu-usuario" title="Mi perfil">
+          <span class="menu-usuario-inicial" aria-hidden="true">{{ nombre_usuario[:1]|upper }}</span>
+          <span class="menu-usuario-texto">
+            <strong>{{ nombre_usuario }}</strong>
+            <small>{{ etiquetas_rol.get(rol, 'Usuario') }}</small>
+          </span>
+        </a>
+        <a href="{{ url_for('auth.logout') }}" class="menu-salir">Cerrar sesión</a>
       {% else %}
         <a href="{{ url_for('auth.login') }}">Iniciar sesión</a>
         <a href="{{ url_for('auth.registro') }}" class="menu-cta">Registrarme</a>
