@@ -3661,433 +3661,140 @@ body:has(.perfil-pagina) .contenido {
 
 /* INICIO AGREGADO JESUS: ESTILOS DE MI HORARIO PROFESIONAL */
 
-.horarios-profesional {
-  width: min(1100px, 94%);
-  margin: 0 auto;
-  padding: 15px 0 45px;
-  color: #342921;
-}
+.semana { width: 100%; max-width: 1040px; box-sizing: border-box; padding-inline: 3%; margin: 0 auto; padding-block: 24px 56px; color: var(--tinta); }
 
-.horarios-encabezado {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 20px;
-  padding: 35px 38px;
-  margin-bottom: 23px;
-  border-radius: 22px;
-  background: linear-gradient(120deg, #2E241E, #69523E);
-  color: white;
-  box-shadow: 0 10px 25px rgba(46, 36, 30,.12);
-}
-
-.horarios-subtitulo {
-  display: inline-block;
-  margin-bottom: 10px;
-  color: #C6AE96;
-  font-size: 11px;
-  font-weight: 800;
-  letter-spacing: 2px;
-}
-
-.horarios-encabezado h1 {
-  margin: 0 0 9px;
-  color: white;
-  font-size: clamp(27px,4vw,36px);
-}
-
-.horarios-encabezado p {
-  max-width: 600px;
-  margin: 0;
-  color: #EFEAE3;
-  font-size: 14px;
-  line-height: 1.6;
-}
-
-.horarios-icono {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 75px;
-  height: 75px;
-  flex-shrink: 0;
-  border: 1px solid rgba(255, 255, 255,.25);
+.semana-tarjeta {
+  display: block; max-width: none; gap: 0;
+  background: var(--papel);
+  border: 1px solid var(--linea);
   border-radius: 20px;
-  background: rgba(255, 255, 255,.10);
-  color: #CFB8A0;
-  font-size: 38px;
+  padding: clamp(18px, 3vw, 28px);
 }
 
-.horarios-informacion {
-  display: flex;
-  align-items: flex-start;
-  gap: 13px;
-  padding: 17px 19px;
-  margin-bottom: 30px;
-  border: 1px solid #E0D6CD;
-  border-radius: 14px;
-  background: #F9F5F2;
-}
+.semana-cabecera { display: flex; align-items: flex-start; justify-content: space-between; gap: 20px; flex-wrap: wrap; }
+.semana-cabecera h1 { margin: 0; font-size: clamp(1.6rem, 3vw, 2rem); line-height: 1.15; }
+.semana-cabecera p { margin: 6px 0 0; color: var(--tinta-suave); font-size: .85rem; }
 
-.horarios-info-icono {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 25px;
-  height: 25px;
-  flex-shrink: 0;
-  border-radius: 50%;
-  background: #E6DED6;
-  color: #7D6145;
-  font-weight: 800;
+.semana-pastillas { display: flex; gap: 8px; }
+.pastilla-dia {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 36px; height: 36px; padding: 0; line-height: 1; text-align: center;
+  border-radius: 50%; border: 0;
+  background: var(--arena-clara); color: var(--tinta-suave);
+  font: 700 .8rem "Manrope", system-ui, sans-serif;
+  cursor: pointer; transition: background .15s, color .15s;
 }
+.pastilla-dia[aria-pressed="true"] { background: var(--espresso); color: var(--marfil); }
+.pastilla-dia:hover { background: var(--arena); color: var(--tinta); }
+.pastilla-dia[aria-pressed="true"]:hover { background: var(--camel-oscuro); color: #fff; }
 
-.horarios-informacion p {
-  margin: 0;
-  color: #6D695D;
-  font-size: 13px;
-  line-height: 1.7;
+.semana-atajos { display: flex; flex-wrap: wrap; gap: 8px; margin: 14px 0 10px; }
+.atajo {
+  display: inline-flex; align-items: center; gap: 6px;
+  padding: 6px 14px; border-radius: var(--r-pastilla);
+  border: 1px solid var(--arena); background: var(--crema); color: var(--tinta);
+  font: 600 .8rem "Manrope", system-ui, sans-serif; cursor: pointer;
+  transition: background .15s, border-color .15s;
 }
+.atajo:hover { background: var(--arena-clara); border-color: var(--camel); }
 
-.horarios-formulario {
-  padding: 27px;
-  border: 1px solid #EAE5DB;
-  border-radius: 19px;
-  background: #FFFFFF;
-  box-shadow: 0 7px 22px rgba(43, 34, 28,.045);
+/* Las tres columnas de cada fila comparten medidas con el eje de horas */
+.semana { --col-nombre: 120px; --col-resumen: 170px; }
+
+.semana-eje {
+  padding: 0 12px 8px calc(var(--col-nombre) + var(--col-resumen) + 36px);
+  border-bottom: 1px solid var(--linea);
+  font-size: .68rem; color: var(--tinta-suave);
 }
+.eje-horas { position: relative; height: 14px; }
+.eje-horas span { position: absolute; top: 0; transform: translateX(-50%); white-space: nowrap; }
+.eje-horas span:first-child { transform: none; }
+.eje-horas span:last-child { transform: translateX(-100%); }
 
-.horarios-titulo-formulario {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 15px;
-  margin-bottom: 23px;
-}
+.dia { border-bottom: 1px solid var(--arena-clara); border-radius: 14px; }
+.dia:last-child { border-bottom: 0; }
+.dia.abierto { background: #F8F2E8; border-bottom-color: transparent; }
 
-.horarios-etiqueta {
-  color: #8D6C4C;
-  font-size: 10px;
-  font-weight: 800;
-  letter-spacing: 1.7px;
-}
-
-.horarios-titulo-formulario h2 {
-  margin: 6px 0;
-  color: #2E241E;
-  font-size: 23px;
-}
-
-.horarios-titulo-formulario p {
-  margin: 0;
-  color: #778078;
-  font-size: 13px;
-}
-
-.horarios-total-dias {
-  padding: 9px 13px;
-  border-radius: 9px;
-  background: #F1ECE8;
-  color: #7D6145;
-  font-size: 12px;
-  font-weight: 800;
-  white-space: nowrap;
-}
-
-.horarios-lista {
+.dia-fila {
   display: grid;
-  gap: 15px;
+  grid-template-columns: var(--col-nombre) var(--col-resumen) 1fr;
+  grid-template-areas: "nombre resumen pista";
+  align-items: center; column-gap: 12px;
+  padding: 9px 12px; cursor: pointer; position: relative;
 }
-
-.horario-dia {
-  min-width: 0;
-  padding: 20px;
-  border: 1px solid #EAE5DB;
-  border-radius: 15px;
-  background: #FBFAF9;
+.dia-cabeza { grid-area: nombre; display: flex; align-items: center; gap: 10px; }
+.dia-nombre {
+  width: 78px; text-align: left; background: none; border: 0; padding: 0; cursor: pointer;
+  font: 600 .9rem "Manrope", system-ui, sans-serif; color: var(--tinta);
 }
-
-.horario-dia-encabezado {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 15px;
-  margin-bottom: 18px;
+.interruptor { position: relative; display: inline-flex; cursor: pointer; margin: 0; }
+.interruptor input { position: absolute; opacity: 0; width: 100%; height: 100%; margin: 0; cursor: pointer; }
+.interruptor-pista {
+  position: relative; width: 34px; height: 20px; border-radius: 999px;
+  background: var(--arena); transition: background .15s;
 }
-
-.horario-dia legend {
-  padding: 0;
-  color: #2E241E;
-  font-size: 17px;
-  font-weight: 800;
+.interruptor-pista::after {
+  content: ""; position: absolute; top: 3px; left: 3px; width: 14px; height: 14px;
+  border-radius: 50%; background: var(--papel); transition: transform .15s;
 }
+.interruptor input:checked + .interruptor-pista { background: var(--espresso); }
+.interruptor input:checked + .interruptor-pista::after { transform: translateX(14px); }
+.interruptor input:focus-visible + .interruptor-pista { outline: 2px solid var(--camel-oscuro); outline-offset: 3px; }
 
-.horario-activo {
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  color: #69523E;
-  font-size: 12px;
-  font-weight: 700;
-  cursor: pointer;
+.dia-resumen { grid-area: resumen; display: flex; flex-direction: column; gap: 1px; font-size: .78rem; color: var(--tinta-suave); min-height: 32px; justify-content: center; }
+.dia-resumen strong { color: var(--tinta); font-size: .8rem; font-weight: 700; }
+.resumen-apagado { color: var(--tinta-suave); }
+
+.dia-pista { grid-area: pista; position: relative; height: 8px; border-radius: 999px; background: var(--arena-clara); }
+.tramo { position: absolute; top: 0; bottom: 0; background: var(--camel); border-radius: 999px; }
+
+.dia.inactivo .dia-nombre { color: var(--tinta-suave); font-weight: 500; }
+
+/* Editor de la fila: sin JS siempre visible; con JS solo en la fila abierta */
+.dia-editor {
+  display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px;
+  margin: 0 12px 10px; padding: 12px;
+  background: var(--papel); border: 1px solid var(--arena-clara); border-radius: 14px;
 }
-
-.horario-activo input {
-  width: 17px;
-  height: 17px;
-  margin: 0;
-  accent-color: #69523E;
-  cursor: pointer;
+.semana.js .dia:not(.abierto) .dia-editor { display: none; }
+.campo-hora { display: flex; flex-direction: column; gap: 5px; margin: 0; font-size: .72rem; color: var(--tinta-suave); }
+.campo-hora input {
+  width: 100%; min-width: 0; box-sizing: border-box; padding: 9px 10px; border: 1px solid var(--arena); border-radius: 10px;
+  background: var(--papel); color: var(--tinta); font: 500 .9rem "Manrope", system-ui, sans-serif;
 }
+.campo-hora input:focus { outline: 2px solid var(--camel); outline-offset: 1px; border-color: var(--camel); }
+.dia-error { grid-column: 1 / -1; margin: 0; color: var(--rojo); font-size: .8rem; }
 
-.campos-horario {
-  display: grid;
-  grid-template-columns: repeat(4, minmax(0,1fr));
-  gap: 13px;
+.semana-pie { display: flex; align-items: center; justify-content: space-between; gap: 16px; flex-wrap: wrap; margin-top: 10px; padding-top: 14px; border-top: 1px solid var(--linea); }
+.semana-leyenda { display: flex; gap: 18px; font-size: .75rem; color: var(--tinta-suave); }
+.semana-leyenda span { display: inline-flex; align-items: center; gap: 6px; }
+.leyenda-barra { width: 14px; height: 7px; border-radius: 999px; background: var(--camel); }
+.leyenda-pausa { width: 14px; height: 7px; border-radius: 999px; border: 1px solid var(--arena); background: var(--papel); box-sizing: border-box; }
+.semana-guardar {
+  padding: 12px 28px; border: 0; border-radius: var(--r-pastilla);
+  background: var(--espresso); color: var(--marfil);
+  font: 700 .9rem "Manrope", system-ui, sans-serif; cursor: pointer; transition: background .2s;
 }
+.semana-guardar:hover { background: var(--camel-oscuro); color: #fff; }
 
-.campo-horario {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-  min-width: 0;
-}
-
-.campo-horario span {
-  color: #69736B;
-  font-size: 11px;
-  font-weight: 700;
-}
-
-.campo-horario input {
-  box-sizing: border-box;
-  width: 100%;
-  min-width: 0;
-  padding: 11px 9px;
-  border: 1px solid #E2DED5;
-  border-radius: 9px;
-  background: white;
-  color: #342921;
-  font-size: 13px;
-}
-
-.campo-horario input:focus {
-  outline: none;
-  border-color: #69523E;
-  box-shadow: 0 0 0 3px rgba(105, 82, 62,.10);
-}
-
-.horario-ayuda {
-  margin: 13px 0 0;
-  color: #92968F;
-  font-size: 11px;
-}
-
-.horarios-guardar {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 20px;
-  padding-top: 23px;
-  margin-top: 22px;
-  border-top: 1px solid #EEEAE2;
-}
-
-.horarios-guardar strong {
-  display: block;
-  color: #2E241E;
-  font-size: 13px;
-}
-
-.horarios-guardar p {
-  margin: 5px 0 0;
-  color: #899088;
-  font-size: 11px;
-}
-
-.horarios-boton-guardar {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: 9px;
-  padding: 13px 20px;
-  border: none;
-  border-radius: 10px;
-  background: #2E241E;
-  color: white;
-  font-size: 13px;
-  font-weight: 800;
-  cursor: pointer;
-  transition: background .2s ease, transform .2s ease;
-}
-
-.horarios-boton-guardar:hover {
-  background: #69523E;
-  transform: translateY(-2px);
-}
-
-.horarios-boton-guardar span {
-  color: #CFB8A0;
-}
-
-.horarios-guardados {
-  margin-top: 38px;
-}
-
-.horarios-guardados-lista {
-  display: grid;
-  grid-template-columns: repeat(2,minmax(0,1fr));
-  gap: 13px;
-}
-
-.horario-guardado-card {
-  padding: 18px;
-  border: 1px solid #EAE5DB;
-  border-radius: 14px;
-  background: white;
-}
-
-.horario-guardado-dia {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  margin-bottom: 15px;
-}
-
-.horario-guardado-dia span {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 27px;
-  height: 27px;
-  border-radius: 50%;
-  background: #F2EEE7;
-  color: #69523E;
-  font-size: 13px;
-  font-weight: 800;
-}
-
-.horario-guardado-dia strong {
-  color: #2E241E;
-  font-size: 15px;
-}
-
-.horario-guardado-detalles {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 12px;
-}
-
-.horario-guardado-detalles span {
-  display: block;
-  margin-bottom: 5px;
-  color: #899088;
-  font-size: 10px;
-}
-
-.horario-guardado-detalles strong {
-  color: #526054;
-  font-size: 12px;
-}
-
-.horarios-vacio {
-  padding: 45px 20px;
-  border: 1px dashed #D9D7CC;
-  border-radius: 17px;
-  background: #FBF9F7;
-  text-align: center;
-}
-
-.horarios-vacio div {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 58px;
-  height: 58px;
-  margin: 0 auto 15px;
-  border-radius: 50%;
-  background: #ECE7E2;
-  color: #8D6C4C;
-  font-size: 29px;
-}
-
-.horarios-vacio h3 {
-  margin: 0 0 8px;
-  color: #2E241E;
-  font-size: 18px;
-}
-
-.horarios-vacio p {
-  max-width: 400px;
-  margin: 0 auto;
-  color: #788078;
-  font-size: 13px;
-  line-height: 1.6;
-}
-
-/* INICIO AGREGADO JESUS: RESPONSIVE DE MI HORARIO */
-
-@media (max-width: 850px) {
-  .campos-horario {
-    grid-template-columns: repeat(2,minmax(0,1fr));
+@media (max-width: 640px) {
+  .semana-eje { display: none; }
+  .dia-fila {
+    grid-template-columns: auto 1fr;
+    grid-template-areas: "nombre resumen" "pista pista";
+    column-gap: 16px;
+    row-gap: 10px;
   }
+  .dia-resumen { align-items: flex-end; }
+  .dia-editor { grid-template-columns: repeat(2, minmax(0, 1fr)); padding: 12px; gap: 10px; }
+  .campo-hora input { padding: 9px 6px; font-size: .82rem; }
+  .semana-guardar { width: 100%; }
 }
 
-@media (max-width: 650px) {
-  .horarios-profesional {
-    width: 94%;
-    padding-top: 8px;
-  }
-
-  .horarios-encabezado {
-    padding: 25px 20px;
-    border-radius: 17px;
-  }
-
-  .horarios-icono {
-    width: 53px;
-    height: 53px;
-    border-radius: 14px;
-    font-size: 27px;
-  }
-
-  .horarios-formulario {
-    padding: 17px;
-  }
-
-  .horarios-titulo-formulario h2 {
-    font-size: 20px;
-  }
-
-  .horario-dia {
-    padding: 15px;
-  }
-
-  .horario-dia-encabezado {
-    align-items: flex-start;
-    flex-direction: column;
-  }
-
-  .campos-horario {
-    grid-template-columns: repeat(2,minmax(0,1fr));
-    gap: 12px;
-  }
-
-  .horarios-guardar {
-    align-items: stretch;
-    flex-direction: column;
-  }
-
-  .horarios-boton-guardar {
-    width: 100%;
-  }
-
-  .horarios-guardados-lista {
-    grid-template-columns: 1fr;
-  }
+@media (prefers-reduced-motion: reduce) {
+  .interruptor-pista, .interruptor-pista::after, .pastilla-dia { transition: none; }
 }
 
-/* FIN AGREGADO JESUS: RESPONSIVE DE MI HORARIO */
 /* FIN AGREGADO JESUS: ESTILOS DE MI HORARIO PROFESIONAL */
 
 /* INICIO AGREGADO JESUS: DISEÑO PÚBLICO DEL NEGOCIO */
