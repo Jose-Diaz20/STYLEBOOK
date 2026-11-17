@@ -91,40 +91,7 @@
   </main>
 
   <footer class="pie">
-    <div class="pie-contenido">
-      <div class="pie-marca">
-        <p class="pie-logo">Style<span>Book</span></p>
-        <p class="pie-frase">Cuida tu estilo.</p>
-      </div>
-
-      {% if not es_proveedor and rol != 'admin' %}
-      <div class="pie-columna">
-        <h2>Explorar</h2>
-        <a href="{{ url_for('servicios.catalogo') }}">Servicios</a>
-        <a href="{{ url_for('profesionales.listar') }}">Profesionales</a>
-      </div>
-      {% endif %}
-
-      <div class="pie-columna">
-        <h2>Tu cuenta</h2>
-        {% if session.get('access_token') %}
-          {% if rol == 'cliente' %}
-            <a href="{{ url_for('citas.mis_citas') }}">Mis citas</a>
-          {% elif es_proveedor %}
-            <a href="{{ url_for('citas.agenda') }}">Mi agenda</a>
-            <a href="{{ url_for('servicios.gestionar') }}">Mis servicios</a>
-          {% elif rol == 'admin' %}
-            <a href="{{ url_for('admin.panel') }}">Panel admin</a>
-          {% endif %}
-          <a href="{{ url_for('perfil.ver') }}">Mi perfil</a>
-          <a href="{{ url_for('auth.logout') }}">Cerrar sesión</a>
-        {% else %}
-          <a href="{{ url_for('auth.login') }}">Iniciar sesión</a>
-          <a href="{{ url_for('auth.registro') }}">Registrarme</a>
-        {% endif %}
-      </div>
-    </div>
-    <p class="pie-base">StyleBook &middot; Sprint 1</p>
+    <p class="pie-base">StyleBook &middot; Cuida tu estilo</p>
   </footer>
 
   <script>
