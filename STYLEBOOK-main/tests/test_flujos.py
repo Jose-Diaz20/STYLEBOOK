@@ -1,0 +1,773 @@
+"""Pruebas de flujos de la app con Supabase simulada (tests/fake_supabase.py)."""
+import pathlib
+from datetime import date, datetime, timedelta
+
+from disponibilidad import (
+    a_time, ahora_local, error_de_fecha, generar_franjas_libres, hay_cruce, sumar_minutos,
+)
+from utilidades import destino_seguro, mensaje_error, telefono_valido
+
+RAIZ = pathlib.Path(__file__).resolve().parent.parent
+
+
+# ---------- Utilidades ----------
+
+def proximo_dia(dia_semana, minimo=2):
+    d = date.today() + timedelta(days=minimo)
+    while d.weekday() != dia_semana:
+        d += timedelta(days=1)
+    return d
+
+
+def token(c):
+    c.get("/login")
+    with c.session_transaction() as s:
+        return s["csrf_token"]
+
+
+def post(c, url, datos=None, **kw):
+    return c.post(url, data={"csrf_token": token(c), **(datos or {})}, **kw)
+
+
+def entrar(c, email, password="secreto1"):
+    return post(c, "/login", {"email": email, "password": password})
+
+
+def escenario(db):
+    """Un proveedor aprobado con un servicio de 60 min y horario lunes 09:00-12:00."""
+    uid = db.agregar_usuario("local@x.co", "secreto1", "Barbería Central", "establecimiento")
+    pid = db.insertar("profesionales", perfil_id=uid, nombre_negocio="Barbería Central",
+                      especialidad="Barbería", ubicacion="Cra 5 # 10-20", telefono="3001234567",
+                      tipo_proveedor="establecimiento", estado="aprobado", anios_experiencia=3)
+    sid = db.insertar("servicios", profesional_id=pid, nombre="Corte clásico VIP", categoria="barbería",
+                      precio=30000, duracion_min=60, activo=True)
+    db.insertar("horarios_profesional", profesional_id=pid, dia_semana=0,
+                hora_inicio="09:00", hora_fin="12:00")
+    db.agregar_usuario("ana@x.co", "secreto1", "Ana", "cliente")
+    return uid, pid, sid
+
+
+# ---------- Arranque y estructura (bloqueantes del informe) ----------
+
+def test_app_arranca_con_endpoints_unicos(app):
+    endpoints = [r.endpoint for r in app.url_map.iter_rules()]
+    assert endpoints.count("citas.cancelar") == 1
+    assert app.test_client().get("/").status_code == 200
+
+
+def test_sin_marcadores_de_merge_ni_restos():
+    for ruta in list(RAIZ.glob("templates/**/*.html")) + [RAIZ / "static/css/estilos.css"]:
+        texto = ruta.read_text(encoding="utf-8")
+        assert "<<<<<<<" not in texto and ">>>>>>>" not in texto, ruta
+        assert "HOLA" not in texto, ruta
+    assert "ManoLista" not in (RAIZ / "utilidades.py").read_text(encoding="utf-8")
+
+
+# ---------- Seguridad ----------
+
+def test_post_sin_csrf_es_rechazado(cliente_http):
+    assert cliente_http.post("/login", data={"email": "a@b.co", "password": "x"}).status_code == 400
+
+
+def test_open_redirect_bloqueado(cliente_http, db):
+    db.agregar_usuario("ana@x.co", "secreto1", "Ana")
+    for malo in ("//evil.com", "https://evil.com", "/\\evil.com"):
+        r = post(cliente_http, "/login?volver=" + malo, {"email": "ana@x.co", "password": "secreto1"})
+        assert r.status_code == 302 and "evil.com" not in r.headers["Location"], malo
+        cliente_http.get("/logout")
+    r = post(cliente_http, "/login?volver=/servicios", {"email": "ana@x.co", "password": "secreto1"})
+    assert r.headers["Location"].endswith("/servicios")
+
+
+def test_destino_seguro_unitario():
+    assert destino_seguro("/mis-citas") == "/mis-citas"
+    assert destino_seguro("//x.com") is None and destino_seguro("http://x.com") is None
+    assert destino_seguro(None, "/inicio") == "/inicio"
+
+
+# ---------- RF-01: tipos de cuenta ----------
+
+def test_registro_guarda_tipo_de_cuenta_y_admin_no_es_elegible(cliente_http, db):
+    datos = {"nombre": "Luis", "email": "luis@x.co", "password": "secreto1", "telefono": "3001112222",
+             "tipo_cuenta": "profesional"}
+    db.exigir_confirmacion = True   # el caso que antes perdía el rol
+    r = post(cliente_http, "/registro", datos)
+    assert r.status_code == 302 and "/login" in r.headers["Location"]
+    perfil = next(p for p in db.tablas["perfiles"] if p["nombre"] == "Luis")
+    assert perfil["rol"] == "profesional" and perfil["telefono"] == "3001112222"
+
+    db.exigir_confirmacion = False
+    r = post(cliente_http, "/registro", {**datos, "email": "hack@x.co", "nombre": "Hack", "tipo_cuenta": "admin"})
+    assert "Elige un tipo de cuenta válido" in r.get_data(as_text=True)
+    assert not any(p["nombre"] == "Hack" for p in db.tablas["perfiles"])
+
+
+def test_establecimiento_es_llevado_a_registrar_su_negocio(cliente_http, db):
+    r = post(cliente_http, "/registro", {"nombre": "Salón Luna", "email": "luna@x.co",
+             "password": "secreto1", "tipo_cuenta": "establecimiento"})
+    assert r.status_code == 302 and "/mi-negocio/registro" in r.headers["Location"]
+    r = post(cliente_http, "/mi-negocio/registro", {
+        "nombre_negocio": "Salón Luna", "especialidad": "Peluquería", "ubicacion": "Calle 1 # 2-3",
+        "telefono": "3001234567", "descripcion": "", "anios_experiencia": "2"})
+    assert r.status_code == 302
+    negocio = db.tablas["profesionales"][0]
+    assert negocio["estado"] == "pendiente" and negocio["tipo_proveedor"] == "establecimiento"
+    assert negocio["ubicacion"] == "Calle 1 # 2-3"
+
+
+def test_registro_valida_datos(cliente_http):
+    base = {"nombre": "X", "email": "x@x.co", "password": "secreto1", "tipo_cuenta": "cliente"}
+    assert "correo electrónico válido" in post(cliente_http, "/registro", {**base, "email": "malo"}).get_data(as_text=True)
+    assert "teléfono no es válido" in post(cliente_http, "/registro", {**base, "telefono": "abc"}).get_data(as_text=True)
+    assert "al menos 6" in post(cliente_http, "/registro", {**base, "password": "123"}).get_data(as_text=True)
+
+
+def test_control_de_acceso_por_rol(cliente_http, db):
+    escenario(db)
+    assert cliente_http.get("/mis-citas").status_code == 302          # sin sesión → login
+    entrar(cliente_http, "ana@x.co")
+    assert cliente_http.get("/mi-agenda").status_code == 403           # cliente no entra a agenda
+    assert cliente_http.get("/mis-servicios").status_code == 403
+    assert cliente_http.get("/admin/").status_code == 403
+    cliente_http.get("/logout")
+    entrar(cliente_http, "local@x.co")
+    assert cliente_http.get("/mis-citas").status_code == 403           # proveedor no reserva
+
+
+# ---------- Visibilidad de proveedores (RN-05, RF-07) ----------
+
+def test_proveedor_pendiente_no_es_publico_ni_reservable(cliente_http, db):
+    uid = db.agregar_usuario("p@x.co", "secreto1", "Pend", "profesional")
+    pid = db.insertar("profesionales", perfil_id=uid, nombre_negocio="Pendiente SA", especialidad="Uñas",
+                      estado="pendiente", tipo_proveedor="independiente")
+    db.insertar("servicios", profesional_id=pid, nombre="Secreto", categoria="uñas", precio=10, duracion_min=30, activo=True)
+    db.agregar_usuario("ana@x.co", "secreto1", "Ana", "cliente")
+
+    assert "Secreto" not in cliente_http.get("/servicios").get_data(as_text=True)
+    assert "Pendiente SA" not in cliente_http.get("/profesionales").get_data(as_text=True)
+    assert cliente_http.get(f"/profesionales/{pid}").status_code == 404
+    entrar(cliente_http, "ana@x.co")
+    assert cliente_http.get(f"/profesionales/{pid}/reservar").status_code == 404
+    assert cliente_http.get(f"/profesionales/{pid}/horarios-disponibles?fecha=2030-01-01&servicio_id=x").get_json()["horarios"] == []
+
+
+def test_detalle_muestra_ubicacion_horario_y_disponibilidad(cliente_http, db):
+    _, pid, _ = escenario(db)
+    html = cliente_http.get(f"/profesionales/{pid}").get_data(as_text=True)
+    assert "Cra 5 # 10-20" in html            # ubicación (RF-07)
+    assert "Lunes" in html and "09:00 – 12:00" in html   # horario
+    assert "Próxima disponibilidad" in html and "09:00" in html
+
+
+# ---------- Disponibilidad y no duplicidad (RN-08/09/10) ----------
+
+def reservar(c, pid, sid, fecha, hora):
+    return post(c, f"/profesionales/{pid}/reservar",
+                {"servicio_id": sid, "fecha": fecha.isoformat(), "hora_inicio": hora})
+
+
+def test_reserva_completa_y_no_se_ofrece_lo_ocupado(cliente_http, db):
+    _, pid, sid = escenario(db)
+    lunes = proximo_dia(0)
+    entrar(cliente_http, "ana@x.co")
+
+    r = reservar(cliente_http, pid, sid, lunes, "09:00")
+    assert r.status_code == 302 and "/mis-citas" in r.headers["Location"]
+    cita = db.tablas["citas"][0]
+    assert cita["hora_inicio"] == "09:00:00" and cita["hora_fin"] == "10:00:00" and cita["cliente_nombre"] == "Ana"
+
+    # El servicio dura 60 min: las horas se ofrecen de hora en hora; con 09:00-10:00 ocupado queda 10:00 y 11:00
+    url = f"/profesionales/{pid}/horarios-disponibles?servicio_id={sid}&fecha={lunes}"
+    horas = cliente_http.get(url).get_json()["horarios"]
+    assert horas == ["10:00", "11:00"]   # 10:00 sí: empieza justo cuando termina la otra cita
+
+    # Reservar a mano un horario ocupado es rechazado por la app
+    r = reservar(cliente_http, pid, sid, lunes, "09:30")
+    assert "ya no está disponible" in r.get_data(as_text=True)
+    assert len(db.tablas["citas"]) == 1
+
+    # Cita pegada a la anterior: debe aceptarse (antes el chequeo con texto la marcaba como choque)
+    assert reservar(cliente_http, pid, sid, lunes, "10:00").status_code == 302
+    assert len(db.tablas["citas"]) == 2
+
+
+def test_carrera_de_dos_clientes_muestra_mensaje_amable(cliente_http, db, monkeypatch):
+    _, pid, sid = escenario(db)
+    lunes = proximo_dia(0)
+    entrar(cliente_http, "ana@x.co")
+    import blueprints.citas as citas
+    # Simula que otro cliente reserva entre el cálculo de horas libres y el insert
+    original = citas._libres_del_dia
+    def desactualizado(*a, **k):
+        db.insertar("citas", cliente_id="otro", profesional_id=pid, servicio_id=sid,
+                    fecha=lunes.isoformat(), hora_inicio="09:00", hora_fin="10:00", estado="confirmada")
+        monkeypatch.setattr(citas, "_libres_del_dia", original)
+        return ["09:00"]
+    monkeypatch.setattr(citas, "_libres_del_dia", desactualizado)
+    html = reservar(cliente_http, pid, sid, lunes, "09:00").get_data(as_text=True)
+    assert "acaba de ser ocupado" in html and "conflicting key" not in html and "23P01" not in html
+
+
+def test_no_se_reserva_en_el_pasado_ni_fuera_de_horario(cliente_http, db):
+    _, pid, sid = escenario(db)
+    entrar(cliente_http, "ana@x.co")
+    ayer = date.today() - timedelta(days=1)
+    assert "fecha pasada" in reservar(cliente_http, pid, sid, ayer, "09:00").get_data(as_text=True)
+    lunes = proximo_dia(0)
+    assert "ya no está disponible" in reservar(cliente_http, pid, sid, lunes, "15:00").get_data(as_text=True)   # fuera de horario
+    martes = proximo_dia(1)
+    assert "ya no está disponible" in reservar(cliente_http, pid, sid, martes, "09:00").get_data(as_text=True)  # día sin atención
+    lejos = date.today() + timedelta(days=400)
+    assert "días de anticipación" in reservar(cliente_http, pid, sid, lejos, "09:00").get_data(as_text=True)
+    assert db.tablas["citas"] == []
+
+
+# ---------- Reprogramación (RN-08/09/10) ----------
+
+def crear_cita(db, pid, sid, fecha, ini, fin, estado="confirmada", cliente="ana@x.co"):
+    uid = next(u["id"] for u in db.usuarios if u["email"] == cliente)
+    return db.insertar("citas", cliente_id=uid, profesional_id=pid, servicio_id=sid, fecha=fecha.isoformat(),
+                       hora_inicio=ini, hora_fin=fin, estado=estado, cliente_nombre="Ana")
+
+
+def test_reprogramar_valida_horario_cruce_y_permite_pegado(cliente_http, db):
+    _, pid, sid = escenario(db)
+    lunes = proximo_dia(0)
+    mia = crear_cita(db, pid, sid, lunes, "09:00", "10:00")
+    otra = crear_cita(db, pid, sid, lunes, "10:00", "11:00", cliente="ana@x.co")
+    entrar(cliente_http, "ana@x.co")
+
+    url = f"/mis-citas/{mia}/reprogramar"
+    def mover(fecha, hora):
+        return post(cliente_http, url, {"fecha": fecha.isoformat(), "hora_inicio": hora})
+
+    assert "no está disponible" in mover(lunes, "10:30").get_data(as_text=True)          # cruza con la otra
+    assert "no está disponible" in mover(lunes, "15:00").get_data(as_text=True)          # fuera de horario del proveedor
+    assert "fecha pasada" in mover(date.today() - timedelta(days=2), "09:00").get_data(as_text=True)
+    r = mover(lunes, "11:00")                                                             # pegada al final de la otra: OK
+    assert r.status_code == 302
+    c = next(c for c in db.tablas["citas"] if c["id"] == mia)
+    assert c["hora_inicio"] == "11:00:00" and c["hora_fin"] == "12:00:00"
+
+    # Su propia cita no bloquea su horario actual: "moverla" a donde ya está es válido
+    assert mover(lunes, "11:00").status_code == 302
+
+
+def test_cancelar_libera_el_horario_y_no_toca_citas_ajenas(cliente_http, db):
+    _, pid, sid = escenario(db)
+    lunes = proximo_dia(0)
+    cid = crear_cita(db, pid, sid, lunes, "09:00", "10:00")
+    ajena = db.insertar("citas", cliente_id="otro", profesional_id=pid, servicio_id=sid, fecha=lunes.isoformat(),
+                        hora_inicio="10:00", hora_fin="11:00", estado="confirmada")
+    entrar(cliente_http, "ana@x.co")
+    assert post(cliente_http, f"/mis-citas/{ajena}/cancelar").status_code == 404
+    assert post(cliente_http, f"/mis-citas/{cid}/cancelar").status_code == 302
+    estados = {c["id"]: c["estado"] for c in db.tablas["citas"]}
+    assert estados[cid] == "cancelada" and estados[ajena] == "confirmada"
+    horas = cliente_http.get(f"/profesionales/{pid}/horarios-disponibles?servicio_id={sid}&fecha={lunes}").get_json()["horarios"]
+    assert "09:00" in horas
+
+
+# ---------- Estados (RN-13) y agenda del proveedor ----------
+
+def test_proveedor_completa_solo_citas_que_ya_empezaron(cliente_http, db):
+    _, pid, sid = escenario(db)
+    futura = crear_cita(db, pid, sid, proximo_dia(0), "09:00", "10:00")
+    ayer = date.today() - timedelta(days=1)
+    pasada = crear_cita(db, pid, sid, ayer, "09:00", "10:00")
+    entrar(cliente_http, "local@x.co")
+
+    assert "Ana" in cliente_http.get("/mi-agenda").get_data(as_text=True)
+    post(cliente_http, f"/mi-agenda/{futura}/estado", {"estado": "completada"})
+    assert next(c for c in db.tablas["citas"] if c["id"] == futura)["estado"] == "confirmada"
+    post(cliente_http, f"/mi-agenda/{pasada}/estado", {"estado": "completada"})
+    assert next(c for c in db.tablas["citas"] if c["id"] == pasada)["estado"] == "completada"
+    # una completada ya no cambia
+    post(cliente_http, f"/mi-agenda/{pasada}/estado", {"estado": "cancelada"})
+    assert next(c for c in db.tablas["citas"] if c["id"] == pasada)["estado"] == "completada"
+
+
+# ---------- Servicios (RN-05) ----------
+
+def test_servicio_se_desactiva_sin_borrar_el_historial(cliente_http, db):
+    _, pid, sid = escenario(db)
+    crear_cita(db, pid, sid, proximo_dia(0), "09:00", "10:00")
+    entrar(cliente_http, "local@x.co")
+    assert post(cliente_http, f"/mis-servicios/{sid}/estado").status_code == 302
+    servicio = db.tablas["servicios"][0]
+    assert servicio["activo"] is False and len(db.tablas["citas"]) == 1     # la cita sigue existiendo
+    assert "Corte clásico VIP" not in cliente_http.get("/servicios").get_data(as_text=True)
+    post(cliente_http, f"/mis-servicios/{sid}/estado")
+    assert db.tablas["servicios"][0]["activo"] is True
+    # no existe la ruta de borrado
+    assert post(cliente_http, f"/mis-servicios/{sid}/eliminar").status_code == 404
+
+
+def test_servicio_valida_precio_y_duracion(cliente_http, db):
+    escenario(db)
+    entrar(cliente_http, "local@x.co")
+    base = {"nombre": "Barba", "categoria": "barbería", "descripcion": "", "precio": "15000", "duracion_min": "30"}
+    assert "mayor que cero" in post(cliente_http, "/mis-servicios/nuevo", {**base, "precio": "0"}).get_data(as_text=True)
+    assert "entre 10 y 480" in post(cliente_http, "/mis-servicios/nuevo", {**base, "duracion_min": "5"}).get_data(as_text=True)
+    assert len(db.tablas["servicios"]) == 1
+    assert post(cliente_http, "/mis-servicios/nuevo", base).status_code == 302
+    assert len(db.tablas["servicios"]) == 2
+
+
+# ---------- Horarios del proveedor ----------
+
+def test_horarios_comparan_horas_reales_y_no_se_solapan(cliente_http, db):
+    escenario(db)
+    entrar(cliente_http, "local@x.co")
+    def agregar(dia, ini, fin):
+        return post(cliente_http, "/mis-horarios/nuevo", {"dia_semana": dia, "hora_inicio": ini, "hora_fin": fin},
+                    follow_redirects=True).get_data(as_text=True)
+    assert "posterior" in agregar("1", "10:00", "09:00")
+    assert "se cruza" in agregar("0", "11:00", "13:00")          # lunes ya tiene 09:00-12:00
+    assert "Franja horaria agregada" in agregar("0", "14:00", "18:00")
+    assert len(db.tablas["horarios_profesional"]) == 2
+
+
+# ---------- Módulo de disponibilidad (unitario) ----------
+
+def test_hora_texto_vs_time_y_bordes():
+    assert a_time("10:00") == a_time("10:00:00")
+    ocupada = [{"hora_inicio": "10:00:00", "hora_fin": "11:00:00"}]
+    assert not hay_cruce(a_time("09:00"), a_time("10:00"), ocupada)     # termina justo cuando empieza otra
+    assert not hay_cruce(a_time("11:00"), a_time("12:00"), ocupada)     # empieza justo cuando termina otra
+    assert hay_cruce(a_time("10:30"), a_time("11:30"), ocupada)
+
+
+def test_franjas_excluyen_horas_pasadas_de_hoy():
+    hoy = date(2030, 5, 6)
+    bloque = [{"hora_inicio": "09:00:00", "hora_fin": "12:00:00"}]
+    ahora = datetime(2030, 5, 6, 10, 20)
+    assert generar_franjas_libres(hoy, bloque, [], 30, ahora=ahora)[0] == "10:30"
+    assert generar_franjas_libres(hoy, bloque, [], 30)[0] == "09:00"
+    assert sumar_minutos(a_time("11:30"), 45).strftime("%H:%M") == "12:15"
+
+
+def test_error_de_fecha():
+    ahora = datetime(2030, 5, 6, 10, 0)
+    assert error_de_fecha(date(2030, 5, 5), ahora) and error_de_fecha(date(2031, 5, 5), ahora)
+    assert error_de_fecha(date(2030, 5, 6), ahora) is None
+
+
+# ---------- Mensajes de error ----------
+
+def test_mensaje_error_no_expone_detalles_tecnicos():
+    from postgrest.exceptions import APIError
+    e = APIError({"message": 'violates exclusion constraint "sin_cruces_horario"', "code": "23P01", "details": None, "hint": None})
+    assert mensaje_error(e) == "Ese horario acaba de ser ocupado por otra reserva. Elige otro."
+    e = APIError({"message": "SB: No se pueden agendar citas en fechas u horas pasadas.", "code": "P0001", "details": None, "hint": None})
+    assert mensaje_error(e) == "No se pueden agendar citas en fechas u horas pasadas."
+    assert "relation" not in mensaje_error(Exception('relation "x" does not exist'))
+    assert telefono_valido("") and telefono_valido("+57 300 123 4567") and not telefono_valido("abc")
+
+
+# ---------- Todas las pantallas renderizan ----------
+
+def test_todas_las_pantallas_renderizan_por_rol(cliente_http, db):
+    uid, pid, sid = escenario(db)
+    lunes = proximo_dia(0)
+    cid = crear_cita(db, pid, sid, lunes, "09:00", "10:00")
+    crear_cita(db, pid, sid, date.today() - timedelta(days=3), "09:00", "10:00", estado="completada")
+    db.agregar_usuario("root@x.co", "secreto1", "Admin", "admin")
+    db.insertar("profesionales", perfil_id="z", nombre_negocio="Por aprobar", especialidad="Uñas",
+                tipo_proveedor="independiente", estado="pendiente", ubicacion="Calle 9", telefono="300")
+
+    for url in ("/", "/servicios", "/servicios?categoria=barbería", "/profesionales", f"/profesionales/{pid}",
+                "/login", "/registro"):
+        assert cliente_http.get(url).status_code == 200, url
+
+    entrar(cliente_http, "ana@x.co")
+    for url in ("/perfil", "/perfil/editar", f"/profesionales/{pid}/reservar",
+                f"/profesionales/{pid}/reservar?servicio_id={sid}", "/mis-citas", f"/mis-citas/{cid}/reprogramar"):
+        assert cliente_http.get(url).status_code == 200, url
+    assert "Historial" in cliente_http.get("/mis-citas").get_data(as_text=True)
+    cliente_http.get("/logout")
+
+    entrar(cliente_http, "local@x.co")
+    for url in ("/perfil", "/mi-negocio", "/mis-servicios", "/mis-servicios/nuevo", f"/mis-servicios/{sid}/editar",
+                "/mis-horarios", "/mi-agenda"):
+        assert cliente_http.get(url).status_code == 200, url
+    assert cliente_http.get("/mi-negocio/registro").status_code == 302     # ya registrado → editar
+    assert cliente_http.get("/mis-servicios/no-existe/editar").status_code == 404
+    cliente_http.get("/logout")
+
+    entrar(cliente_http, "root@x.co")
+    html = cliente_http.get("/admin/").get_data(as_text=True)
+    assert "Por aprobar" in html and "Calle 9" in html
+    nuevo = next(p for p in db.tablas["profesionales"] if p["nombre_negocio"] == "Por aprobar")
+    assert post(cliente_http, f"/admin/profesionales/{nuevo['id']}/aprobar").status_code == 302
+    assert nuevo["estado"] == "aprobado"
+    assert post(cliente_http, "/admin/profesionales/no-existe/aprobar").status_code == 404
+
+
+# ---------- Correcciones reportadas (reservas, sesión, menú, notificaciones) ----------
+
+def test_servicio_de_120_min_se_ofrece_cada_120_min_y_no_cada_media_hora():
+    lunes = date(2030, 5, 6)
+    bloque = [{"hora_inicio": "08:00:00", "hora_fin": "14:00:00"}]
+    assert generar_franjas_libres(lunes, bloque, [], 120) == ["08:00", "10:00", "12:00"]
+    assert generar_franjas_libres(lunes, bloque, [], 45) == ["08:00", "08:45", "09:30", "10:15", "11:00", "11:45", "12:30", "13:15"]
+    # Con una cita de 60 min al inicio, se aprovecha el hueco justo al terminar ella
+    ocupada = [{"hora_inicio": "08:00:00", "hora_fin": "09:00:00"}]
+    assert generar_franjas_libres(lunes, bloque, ocupada, 120) == ["09:00", "10:00", "12:00"]
+
+
+def test_reserva_nace_pendiente_y_el_proveedor_la_confirma(cliente_http, db):
+    _, pid, sid = escenario(db)
+    entrar(cliente_http, "ana@x.co")
+    assert reservar(cliente_http, pid, sid, proximo_dia(0), "09:00").status_code == 302
+    cita = db.tablas["citas"][0]
+    assert cita["estado"] == "pendiente"
+    html = cliente_http.get("/mis-citas").get_data(as_text=True)
+    assert "Pendiente de confirmación" in html
+    cliente_http.get("/logout")
+
+    entrar(cliente_http, "local@x.co")
+    assert "Confirmar" in cliente_http.get("/mi-agenda").get_data(as_text=True)
+    assert post(cliente_http, f"/mi-agenda/{cita['id']}/estado", {"estado": "confirmada"}).status_code == 302
+    assert cita["estado"] == "confirmada"
+
+
+def test_login_no_contamina_el_cliente_publico_y_aterriza_en_la_portada(cliente_http, db):
+    escenario(db)
+    r = entrar(cliente_http, "ana@x.co")
+    assert r.status_code == 302 and r.headers["Location"].endswith("/")
+    html = cliente_http.get("/").get_data(as_text=True)
+    assert "StyleBook" in html and "Reserva tu cita" in html and "Algo salió mal" not in html
+
+    # El módulo real nunca inicia sesión en el cliente compartido
+    fuente = (RAIZ / "blueprints" / "auth.py").read_text()
+    assert "sb.auth" not in fuente
+
+
+def test_menu_segun_tipo_de_cuenta(cliente_http, db):
+    escenario(db)
+    entrar(cliente_http, "ana@x.co")
+    html = cliente_http.get("/").get_data(as_text=True)
+    assert "Mis citas" in html and "Profesionales" in html and "Mi agenda" not in html
+    cliente_http.get("/logout")
+
+    entrar(cliente_http, "local@x.co")
+    html = cliente_http.get("/mi-agenda").get_data(as_text=True)
+    assert "Mi agenda" in html and "Mis servicios" in html and "Mi horario" in html
+    assert "Mis citas" not in html and ">Servicios<" not in html and ">Profesionales<" not in html
+
+
+def test_proveedor_que_intenta_reservar_ve_un_mensaje_claro(cliente_http, db):
+    _, pid, _ = escenario(db)
+    entrar(cliente_http, "local@x.co")
+    r = cliente_http.get(f"/profesionales/{pid}/reservar")
+    assert r.status_code == 403 and "solo para cuentas de cliente" in r.get_data(as_text=True)
+
+
+def test_login_falla_si_no_se_puede_leer_el_perfil(cliente_http, db):
+    escenario(db)
+    db.tablas["perfiles"].clear()          # usuario en Auth sin fila en `perfiles`
+    r = entrar(cliente_http, "ana@x.co")
+    assert r.status_code == 200 and "No pudimos cargar tu perfil" in r.get_data(as_text=True)
+    with cliente_http.session_transaction() as s:
+        assert "access_token" not in s     # no queda una sesión a medias con rol "cliente" por defecto
+
+
+def test_notificaciones_se_listan_y_quedan_leidas(cliente_http, db):
+    uid, pid, sid = escenario(db)
+    ana = next(u["id"] for u in db.usuarios if u["email"] == "ana@x.co")
+    db.insertar("notificaciones", usuario_id=ana, tipo="cita_confirmada", leida=False,
+                mensaje="Tu cita de Corte clásico VIP fue confirmada.", creado_en="2030-05-06T15:00:00+00:00")
+    entrar(cliente_http, "ana@x.co")
+    assert '<span class="globito">1</span>' in cliente_http.get("/").get_data(as_text=True)
+    html = cliente_http.get("/notificaciones").get_data(as_text=True)
+    assert "fue confirmada" in html and "Nueva" in html and "10:00" in html     # 15:00 UTC = 10:00 Bogotá
+    assert all(n["leida"] for n in db.tablas["notificaciones"])
+    assert "globito" not in cliente_http.get("/").get_data(as_text=True)
+
+
+def test_token_por_vencer_se_renueva_y_se_guarda(cliente_http, db, monkeypatch):
+    import base64, json, time, utilidades
+    escenario(db)
+    entrar(cliente_http, "ana@x.co")
+    carga = base64.urlsafe_b64encode(json.dumps({"exp": int(time.time()) + 5}).encode()).decode().rstrip("=")
+    with cliente_http.session_transaction() as s:
+        s["access_token"] = f"h.{carga}.f"
+    nueva = type("S", (), {"access_token": "nuevo-acceso", "refresh_token": "nuevo-refresh"})()
+    monkeypatch.setattr(utilidades, "renovar_sesion", lambda rt: type("R", (), {"session": nueva})())
+    assert cliente_http.get("/mis-citas").status_code == 200
+    with cliente_http.session_transaction() as s:
+        assert s["access_token"] == "nuevo-acceso" and s["refresh_token"] == "nuevo-refresh"
+
+    # Si ya no se puede renovar: vuelve al login (sin 500)
+    with cliente_http.session_transaction() as s:
+        s["access_token"] = f"h.{carga}.f"
+    monkeypatch.setattr(utilidades, "renovar_sesion", lambda rt: (_ for _ in ()).throw(Exception("Already Used")))
+    r = cliente_http.get("/mis-citas")
+    assert r.status_code == 302 and "/login" in r.headers["Location"]
+
+    
+
+# ---------- HU-10: perfil del proveedor y estado activo/inactivo ----------
+
+def datos_negocio(**cambios):
+    base = {"nombre_negocio": "Barbería Central", "especialidad": "Barbería",
+            "ubicacion": "Cra 5 # 10-20", "telefono": "3001234567",
+            "descripcion": "", "anios_experiencia": "3"}
+    return {**base, **cambios}
+
+
+def test_proveedor_edita_nombre_y_especialidad_y_se_ve_de_inmediato(cliente_http, db):
+    escenario(db)
+    entrar(cliente_http, "local@x.co")
+    r = post(cliente_http, "/mi-negocio",
+             datos_negocio(nombre_negocio="Barbería Nueva Era", especialidad="Colorimetría"))
+    assert r.status_code == 302
+    negocio = db.tablas["profesionales"][0]
+    assert negocio["nombre_negocio"] == "Barbería Nueva Era" and negocio["especialidad"] == "Colorimetría"
+
+    cliente_http.get("/logout")
+    html = cliente_http.get("/profesionales").get_data(as_text=True)
+    assert "Barbería Nueva Era" in html and "Colorimetría" in html
+    assert "Barbería Central" not in html
+
+
+def test_editar_negocio_no_permite_dejar_vacia_la_especialidad(cliente_http, db):
+    escenario(db)
+    entrar(cliente_http, "local@x.co")
+    r = post(cliente_http, "/mi-negocio", datos_negocio(especialidad=""))
+    assert "obligatorios" in r.get_data(as_text=True)
+    assert db.tablas["profesionales"][0]["especialidad"] == "Barbería"
+
+
+def test_proveedor_inactivo_desaparece_para_clientes_y_no_recibe_reservas(cliente_http, db):
+    _, pid, sid = escenario(db)
+    entrar(cliente_http, "local@x.co")
+    perfil = cliente_http.get("/perfil").get_data(as_text=True)
+    assert "Visibilidad" in perfil and "Inactivo" not in perfil
+
+    html = post(cliente_http, "/mi-negocio/activo", follow_redirects=True).get_data(as_text=True)
+    assert db.tablas["profesionales"][0]["activo"] is False
+    assert "Quedaste inactivo" in html and "Marcarme como activo" in html
+    assert "Inactivo" in cliente_http.get("/perfil").get_data(as_text=True)
+    cliente_http.get("/logout")
+
+    # Visitante: no aparece en listado ni catálogo, y su perfil público no existe
+    assert "Barbería Central" not in cliente_http.get("/profesionales").get_data(as_text=True)
+    assert "Corte clásico VIP" not in cliente_http.get("/servicios").get_data(as_text=True)
+    assert cliente_http.get(f"/profesionales/{pid}").status_code == 404
+
+    # Cliente con sesión: no puede reservar ni ve horarios
+    entrar(cliente_http, "ana@x.co")
+    lunes = proximo_dia(0)
+    assert cliente_http.get(f"/profesionales/{pid}/reservar").status_code == 404
+    assert reservar(cliente_http, pid, sid, lunes, "09:00").status_code == 404
+    assert db.tablas["citas"] == []
+    url = f"/profesionales/{pid}/horarios-disponibles?servicio_id={sid}&fecha={lunes}"
+    assert cliente_http.get(url).get_json()["horarios"] == []
+
+
+def test_inactivo_conserva_citas_existentes_y_el_cliente_puede_cancelar(cliente_http, db):
+    _, pid, sid = escenario(db)
+    cid = crear_cita(db, pid, sid, proximo_dia(0), "09:00", "10:00")
+    entrar(cliente_http, "local@x.co")
+    post(cliente_http, "/mi-negocio/activo")
+    assert "Ana" in cliente_http.get("/mi-agenda").get_data(as_text=True)   # su agenda sigue intacta
+    cliente_http.get("/logout")
+
+    entrar(cliente_http, "ana@x.co")
+    assert cliente_http.get("/mis-citas").status_code == 200
+    assert post(cliente_http, f"/mis-citas/{cid}/cancelar").status_code == 302
+    assert db.tablas["citas"][0]["estado"] == "cancelada"
+
+
+def test_reactivar_proveedor_lo_devuelve_al_listado_y_a_las_reservas(cliente_http, db):
+    _, pid, sid = escenario(db)
+    entrar(cliente_http, "local@x.co")
+    post(cliente_http, "/mi-negocio/activo")      # pasa a inactivo
+    post(cliente_http, "/mi-negocio/activo")      # vuelve a activo
+    assert db.tablas["profesionales"][0]["activo"] is True
+    cliente_http.get("/logout")
+
+    assert "Barbería Central" in cliente_http.get("/profesionales").get_data(as_text=True)
+    entrar(cliente_http, "ana@x.co")
+    assert reservar(cliente_http, pid, sid, proximo_dia(0), "09:00").status_code == 302
+
+
+def test_solo_el_proveedor_cambia_su_estado_activo(cliente_http, db):
+    escenario(db)
+    assert post(cliente_http, "/mi-negocio/activo").status_code == 302     # sin sesión → login
+    entrar(cliente_http, "ana@x.co")
+    assert post(cliente_http, "/mi-negocio/activo").status_code == 403     # un cliente no puede
+    assert db.tablas["profesionales"][0]["activo"] is True
+
+
+# ---------- HU-14 Calificar el servicio · HU-15 Consultar opiniones (RN-16) ----------
+
+def cita_pasada_completada(db, pid, sid, cliente="ana@x.co", dias=3, ini="09:00", fin="10:00"):
+    return crear_cita(db, pid, sid, date.today() - timedelta(days=dias), ini, fin,
+                      estado="completada", cliente=cliente)
+
+
+def calificar_via_web(c, cita_id, puntuacion="5", comentario="", **kw):
+    return post(c, f"/mis-citas/{cita_id}/calificar", {"puntuacion": puntuacion, "comentario": comentario}, **kw)
+
+
+def test_hu14_cliente_califica_su_cita_completada_y_ya_no_se_le_ofrece_de_nuevo(cliente_http, db):
+    _, pid, sid = escenario(db)
+    cid = cita_pasada_completada(db, pid, sid)
+    entrar(cliente_http, "ana@x.co")
+
+    assert "Calificar servicio" in cliente_http.get("/mis-citas").get_data(as_text=True)
+    formulario = cliente_http.get(f"/mis-citas/{cid}/calificar")
+    assert formulario.status_code == 200 and 'name="puntuacion"' in formulario.get_data(as_text=True)
+
+    r = calificar_via_web(cliente_http, cid, "4", "  Muy buena atención  ", follow_redirects=True)
+    assert "opinión quedó publicada" in r.get_data(as_text=True)
+
+    (fila,) = db.tablas["calificaciones"]
+    assert (fila["cita_id"], fila["puntuacion"], fila["comentario"]) == (cid, 4, "Muy buena atención")
+    assert fila["servicio_nombre"] == "Corte clásico VIP" and fila["cliente_nombre"] == "Ana"
+    assert fila["profesional_id"] == pid
+
+    html = cliente_http.get("/mis-citas").get_data(as_text=True)
+    assert "Tu calificación" in html and "Calificar servicio" not in html
+
+
+def test_hu14_el_comentario_es_opcional(cliente_http, db):
+    _, pid, sid = escenario(db)
+    cid = cita_pasada_completada(db, pid, sid)
+    entrar(cliente_http, "ana@x.co")
+    calificar_via_web(cliente_http, cid, "5", "")
+    assert db.tablas["calificaciones"][0]["comentario"] is None
+
+
+def test_hu14_ca01_no_se_califica_una_cita_que_no_esta_completada(cliente_http, db):
+    _, pid, sid = escenario(db)
+    futura = crear_cita(db, pid, sid, proximo_dia(0), "09:00", "10:00", estado="confirmada")
+    cancelada = cita_pasada_completada(db, pid, sid, dias=5)
+    next(c for c in db.tablas["citas"] if c["id"] == cancelada)["estado"] = "cancelada"
+    entrar(cliente_http, "ana@x.co")
+
+    for cid in (futura, cancelada):
+        r = cliente_http.get(f"/mis-citas/{cid}/calificar", follow_redirects=True)
+        assert "Solo puedes calificar citas completadas" in r.get_data(as_text=True)
+        calificar_via_web(cliente_http, cid, "5")
+    assert db.tablas["calificaciones"] == []
+    assert "Calificar servicio" not in cliente_http.get("/mis-citas").get_data(as_text=True)
+
+
+def test_hu14_ca02_valida_puntuacion_de_1_a_5_y_largo_del_comentario(cliente_http, db):
+    _, pid, sid = escenario(db)
+    cid = cita_pasada_completada(db, pid, sid)
+    entrar(cliente_http, "ana@x.co")
+
+    for mala in ("", "0", "6", "abc", "-1", "4.5"):
+        r = calificar_via_web(cliente_http, cid, mala, "texto")
+        assert r.status_code == 200 and "Elige una puntuación de 1 a 5" in r.get_data(as_text=True), mala
+        assert "texto" in r.get_data(as_text=True)                    # no pierde lo que escribió
+    r = calificar_via_web(cliente_http, cid, "5", "x" * 1001)
+    assert "no puede superar 1000 caracteres" in r.get_data(as_text=True)
+    assert db.tablas["calificaciones"] == []
+
+    calificar_via_web(cliente_http, cid, "5", "x" * 1000)             # el límite exacto sí se acepta
+    assert len(db.tablas["calificaciones"]) == 1
+
+
+def test_hu14_ca03_una_sola_calificacion_por_cita(cliente_http, db):
+    _, pid, sid = escenario(db)
+    cid = cita_pasada_completada(db, pid, sid)
+    entrar(cliente_http, "ana@x.co")
+    calificar_via_web(cliente_http, cid, "5", "Genial")
+
+    for r in (cliente_http.get(f"/mis-citas/{cid}/calificar", follow_redirects=True),
+              calificar_via_web(cliente_http, cid, "1", "Cambio de opinión", follow_redirects=True)):
+        assert "Ya calificaste esta cita" in r.get_data(as_text=True)
+    (fila,) = db.tablas["calificaciones"]
+    assert fila["puntuacion"] == 5 and fila["comentario"] == "Genial"
+
+
+def test_hu14_solo_el_dueno_de_la_cita_puede_calificarla(cliente_http, db):
+    _, pid, sid = escenario(db)
+    db.agregar_usuario("beto@x.co", "secreto1", "Beto", "cliente")
+    de_ana = cita_pasada_completada(db, pid, sid, cliente="ana@x.co")
+
+    entrar(cliente_http, "beto@x.co")
+    assert cliente_http.get(f"/mis-citas/{de_ana}/calificar").status_code == 404
+    assert calificar_via_web(cliente_http, de_ana, "1", "Spam").status_code == 404
+    cliente_http.get("/logout")
+
+    entrar(cliente_http, "local@x.co")                                 # el proveedor tampoco se califica a sí mismo
+    assert cliente_http.get(f"/mis-citas/{de_ana}/calificar").status_code in (302, 403)
+    assert calificar_via_web(cliente_http, de_ana, "5").status_code in (302, 403)
+    cliente_http.get("/logout")
+
+    assert cliente_http.get(f"/mis-citas/{de_ana}/calificar").status_code in (302, 401, 403)   # sin sesión
+    assert db.tablas["calificaciones"] == []
+
+
+def test_hu15_las_opiniones_son_publicas_recientes_primero_y_con_promedio(cliente_http, db):
+    _, pid, sid = escenario(db)
+    db.agregar_usuario("beto@x.co", "secreto1", "Beto Gómez", "cliente")
+    c1 = cita_pasada_completada(db, pid, sid, cliente="ana@x.co", dias=6)
+    c2 = cita_pasada_completada(db, pid, sid, cliente="beto@x.co", dias=2)
+
+    entrar(cliente_http, "ana@x.co")
+    calificar_via_web(cliente_http, c1, "5", "Primera opinión")
+    cliente_http.get("/logout")
+    entrar(cliente_http, "beto@x.co")
+    calificar_via_web(cliente_http, c2, "3", "Segunda opinión")
+    cliente_http.get("/logout")
+    # la más reciente es la de Beto: se fija la fecha para no depender del reloj
+    for k in db.tablas["calificaciones"]:
+        k["creado_en"] = "2026-11-02T12:00:00+00:00" if k["comentario"] == "Primera opinión" else "2026-11-03T12:00:00+00:00"
+
+    html = cliente_http.get(f"/profesionales/{pid}").get_data(as_text=True)     # visitante sin sesión
+    assert "Opiniones de clientes" in html
+    assert "Primera opinión" in html and "Segunda opinión" in html
+    assert html.index("Segunda opinión") < html.index("Primera opinión")          # CA-04: de la más reciente a la más antigua
+    assert "Beto G." in html and "Gómez" not in html                              # RN-18: nombre abreviado
+    assert "Corte clásico VIP" in html and "03/11/2026" in html
+    assert "<strong>4.0</strong>" in html and "2 opiniones" in html                # promedio (5+3)/2
+
+    assert "(2)" in cliente_http.get("/profesionales").get_data(as_text=True)    # también en el listado
+
+
+def test_hu15_proveedor_sin_opiniones_lo_indica(cliente_http, db):
+    _, pid, _ = escenario(db)
+    html = cliente_http.get(f"/profesionales/{pid}").get_data(as_text=True)
+    assert "Todavía no hay opiniones" in html and "Aún no tiene opiniones" in html
+
+
+def test_hu15_el_comentario_se_muestra_escapado(cliente_http, db):
+    _, pid, sid = escenario(db)
+    cid = cita_pasada_completada(db, pid, sid)
+    entrar(cliente_http, "ana@x.co")
+    calificar_via_web(cliente_http, cid, "5", "<script>alert(1)</script>")
+    cliente_http.get("/logout")
+    html = cliente_http.get(f"/profesionales/{pid}").get_data(as_text=True)
+    assert "<script>alert(1)</script>" not in html and "&lt;script&gt;" in html
+
+
+def test_hu15_si_falla_la_lectura_de_opiniones_el_perfil_sigue_abriendo(cliente_http, db, monkeypatch):
+    _, pid, _ = escenario(db)
+    original = db.tablas.pop("calificaciones")          # la consulta de opiniones lanzará KeyError
+    try:
+        r = cliente_http.get(f"/profesionales/{pid}")
+    finally:
+        db.tablas["calificaciones"] = original
+    assert r.status_code == 200 and "Todavía no hay opiniones" in r.get_data(as_text=True)
+
+def test_hu15_el_catalogo_de_servicios_muestra_estrellas_y_enlace_a_las_opiniones(cliente_http, db):
+    _, pid, sid = escenario(db)
+    assert "Aún sin opiniones" in cliente_http.get("/servicios").get_data(as_text=True)
+
+    cid = cita_pasada_completada(db, pid, sid)
+    entrar(cliente_http, "ana@x.co")
+    calificar_via_web(cliente_http, cid, "4", "Muy bien")
+    cliente_http.get("/logout")
+
+    html = cliente_http.get("/servicios").get_data(as_text=True)
+    assert "Aún sin opiniones" not in html
+    assert "4.0" in html and "1 opinión" in html
+    assert f"/profesionales/{pid}#opiniones" in html

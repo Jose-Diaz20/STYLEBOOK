@@ -1,0 +1,195 @@
+{% extends "base.html" %}
+{% block titulo %}Mi horario · StyleBook{% endblock %}
+
+{% block contenido %}
+{% set cortos = ['L', 'M', 'M', 'J', 'V', 'S', 'D'] %}
+
+<section class="semana" data-semana>
+  <form method="post" action="{{ url_for('horarios.guardar_semana') }}" class="semana-tarjeta" novalidate>
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+
+    <header class="semana-cabecera">
+      <div>
+        <h1>Tu semana</h1>
+        <p>Toca un día para activarlo o desactivarlo.</p>
+      </div>
+      <div class="semana-pastillas" role="group" aria-label="Días que atiendes">
+        {% for dia in dias %}
+          <button type="button" class="pastilla-dia" data-pastilla="{{ loop.index0 }}"
+                  aria-pressed="{{ 'true' if por_dia.get(loop.index0) else 'false' }}"
+                  aria-label="{{ dia }}">{{ cortos[loop.index0] }}</button>
+        {% endfor %}
+      </div>
+    </header>
+
+    <div class="semana-atajos">
+      <button type="button" class="atajo" data-atajo="completa">Jornada completa</button>
+      <button type="button" class="atajo" data-atajo="medio">Medio tiempo</button>
+      <button type="button" class="atajo" data-atajo="copiar">
+        <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="9" y="9" width="11" height="11" rx="2"/><path d="M5 15V6a2 2 0 0 1 2-2h9"/></svg>
+        Copiar lunes a lun-vie
+      </button>
+    </div>
+
+    <div class="semana-eje" aria-hidden="true"><div class="eje-horas">
+      <span style="left:0%">6:00</span><span style="left:20%">9:00</span><span style="left:40%">12:00</span>
+      <span style="left:60%">15:00</span><span style="left:80%">18:00</span><span style="left:100%">21:00</span>
+    </div></div>
+
+    <div class="semana-lista">
+      {% for dia in dias %}
+        {% set i = loop.index0 %}
+        {% set h = por_dia.get(i) %}
+        <div class="dia" data-dia="{{ i }}">
+          <div class="dia-fila">
+            <div class="dia-cabeza">
+            <button type="button" class="dia-nombre" aria-expanded="false" aria-controls="editor-{{ i }}">{{ dia }}</button>
+            <label class="interruptor">
+              <input type="checkbox" name="activo_{{ i }}" {% if h %}checked{% endif %}>
+              <span class="interruptor-pista" aria-hidden="true"></span>
+              <span class="solo-lectores">Atiendo el {{ dia|lower }}</span>
+            </label>
+            </div>
+            <div class="dia-resumen" data-resumen></div>
+            <div class="dia-pista" aria-hidden="true"></div>
+          </div>
+
+          <div class="dia-editor" id="editor-{{ i }}">
+            <label class="campo-hora"><span>Entrada</span>
+              <input type="time" name="hora_inicio_{{ i }}" value="{{ h.hora_inicio[:5] if h else '08:00' }}"></label>
+            <label class="campo-hora"><span>Salida</span>
+              <input type="time" name="hora_fin_{{ i }}" value="{{ h.hora_fin[:5] if h else '17:00' }}"></label>
+            <label class="campo-hora"><span>Inicio de pausa</span>
+              <input type="time" name="pausa_inicio_{{ i }}" value="{{ h.pausa_inicio[:5] if h and h.get('pausa_inicio') else '' }}"></label>
+            <label class="campo-hora"><span>Fin de pausa</span>
+              <input type="time" name="pausa_fin_{{ i }}" value="{{ h.pausa_fin[:5] if h and h.get('pausa_fin') else '' }}"></label>
+            <p class="dia-error" role="alert" hidden></p>
+          </div>
+        </div>
+      {% endfor %}
+    </div>
+
+    <footer class="semana-pie">
+      <div class="semana-leyenda">
+        <span><i class="leyenda-barra"></i>Atiendes</span>
+        <span><i class="leyenda-pausa"></i>Pausa</span>
+      </div>
+      <button type="submit" class="semana-guardar">Guardar horario</button>
+    </footer>
+  </form>
+</section>
+
+<script>
+(function () {
+  var raiz = document.querySelector('[data-semana]');
+  if (!raiz) return;
+  raiz.classList.add('js');
+
+  var MIN = 6 * 60, MAX = 21 * 60;
+  var minutos = function (v) { if (!v) return null; var p = v.split(':'); return +p[0] * 60 + +p[1]; };
+  var pct = function (m) { return Math.min(100, Math.max(0, (m - MIN) / (MAX - MIN) * 100)); };
+
+  var filas = Array.prototype.map.call(raiz.querySelectorAll('[data-dia]'), function (el) {
+    var i = el.getAttribute('data-dia');
+    var campo = function (n) { return el.querySelector('[name="' + n + '_' + i + '"]'); };
+    return {
+      el: el, i: i,
+      activo: campo('activo'), ini: campo('hora_inicio'), fin: campo('hora_fin'),
+      pi: campo('pausa_inicio'), pf: campo('pausa_fin'),
+      resumen: el.querySelector('[data-resumen]'), pista: el.querySelector('.dia-pista'),
+      error: el.querySelector('.dia-error'), nombre: el.querySelector('.dia-nombre'),
+      pastilla: raiz.querySelector('[data-pastilla="' + i + '"]')
+    };
+  });
+
+  function validar(f) {
+    if (!f.activo.checked) return '';
+    var a = minutos(f.ini.value), b = minutos(f.fin.value);
+    var p = minutos(f.pi.value), q = minutos(f.pf.value);
+    if (a === null || b === null || b <= a) return 'La salida debe ser posterior a la entrada.';
+    if ((p === null) !== (q === null)) return 'Indica inicio y fin de la pausa, o deja ambos vacíos.';
+    if (p !== null && (q <= p || p <= a || q >= b)) return 'La pausa debe quedar dentro del horario de atención.';
+    return '';
+  }
+
+  function segmento(desde, hasta) {
+    var s = document.createElement('span');
+    s.className = 'tramo';
+    s.style.left = pct(desde) + '%';
+    s.style.width = Math.max(0, pct(hasta) - pct(desde)) + '%';
+    return s;
+  }
+
+  function pintar(f) {
+    var on = f.activo.checked;
+    f.el.classList.toggle('inactivo', !on);
+    f.pastilla.setAttribute('aria-pressed', on ? 'true' : 'false');
+    var msg = validar(f);
+    f.error.textContent = msg; f.error.hidden = !msg;
+    f.pista.innerHTML = '';
+    if (!on) { f.resumen.innerHTML = '<span class="resumen-apagado">No atiendes</span>'; return; }
+    var a = minutos(f.ini.value), b = minutos(f.fin.value);
+    var p = minutos(f.pi.value), q = minutos(f.pf.value);
+    var ok = a !== null && b !== null && b > a;
+    var conPausa = ok && p !== null && q !== null && p > a && q > p && q < b;
+    f.resumen.innerHTML = ok
+      ? '<strong>' + f.ini.value + '–' + f.fin.value + '</strong><span>' + (conPausa ? 'Pausa ' + f.pi.value + '–' + f.pf.value : 'Sin pausa') + '</span>'
+      : '<span class="resumen-apagado">Revisa las horas</span>';
+    if (!ok) return;
+    if (conPausa) { f.pista.appendChild(segmento(a, p)); f.pista.appendChild(segmento(q, b)); }
+    else f.pista.appendChild(segmento(a, b));
+  }
+
+  function abrir(f, abierto) {
+    filas.forEach(function (o) {
+      var v = o === f ? abierto : false;
+      o.el.classList.toggle('abierto', v);
+      o.nombre.setAttribute('aria-expanded', v ? 'true' : 'false');
+    });
+  }
+
+  function poner(f, ini, fin, pi, pf) {
+    f.activo.checked = true; f.ini.value = ini; f.fin.value = fin; f.pi.value = pi; f.pf.value = pf; pintar(f);
+  }
+
+  filas.forEach(function (f) {
+    f.activo.addEventListener('change', function () { pintar(f); });
+    [f.ini, f.fin, f.pi, f.pf].forEach(function (c) {
+      c.addEventListener('input', function () { if (!f.activo.checked) f.activo.checked = true; pintar(f); });
+    });
+    f.pastilla.addEventListener('click', function () { f.activo.checked = !f.activo.checked; pintar(f); });
+    f.el.querySelector('.dia-fila').addEventListener('click', function (e) {
+      if (e.target.closest('.interruptor')) return;
+      abrir(f, !f.el.classList.contains('abierto'));
+    });
+    pintar(f);
+  });
+
+  raiz.querySelectorAll('[data-atajo]').forEach(function (b) {
+    b.addEventListener('click', function () {
+      var tipo = b.getAttribute('data-atajo');
+      if (tipo === 'copiar') {
+        var l = filas[0];
+        filas.slice(1, 5).forEach(function (f) { poner(f, l.ini.value, l.fin.value, l.pi.value, l.pf.value); });
+        l.activo.checked = true; pintar(l);
+        return;
+      }
+      var destino = filas.filter(function (f) { return f.activo.checked; });
+      if (!destino.length) destino = filas.slice(0, 5);
+      destino.forEach(function (f) {
+        if (tipo === 'completa') poner(f, '08:00', '17:00', '12:00', '13:00');
+        else poner(f, '08:00', '13:00', '', '');
+      });
+    });
+  });
+
+  raiz.querySelector('form').addEventListener('submit', function (e) {
+    var malo = filas.filter(function (f) { return validar(f); })[0];
+    if (malo) { e.preventDefault(); abrir(malo, true); malo.error.scrollIntoView({ block: 'center' }); }
+  });
+
+  var primero = filas.filter(function (f) { return f.activo.checked; })[0];
+  if (primero) abrir(primero, true);
+})();
+</script>
+{% endblock %}

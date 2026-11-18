@@ -1,0 +1,41 @@
+{% extends "base.html" %}
+{% block titulo %}Inicio · StyleBook{% endblock %}
+{% block contenido %}
+{% from "macros.html" import estrellas %}
+
+{% set rol = session.get('rol') %}
+
+<!-- PORTADA -->
+<section class="portada">
+  <div class="portada-marco">
+
+    <h1 class="portada-titulo">Cuida tu estilo</h1>
+
+    <div class="portada-cuerpo">
+
+      <div class="portada-texto">
+        <p>
+          Reserva servicios de belleza y cuidado personal
+          con profesionales de confianza.
+        </p>
+        <div class="portada-acciones">
+          <a class="boton-principal" href="{{ url_for('servicios.catalogo') }}">Explorar servicios</a>
+          <a class="boton-contorno" href="{{ url_for('profesionales.listar') }}">Explorar profesionales</a>
+        </div>
+      </div>
+
+      <figure class="portada-arco">
+        <img src="{{ url_for('static', filename='css/img/hero-modelo.jpg') }}"
+             alt="Mujer con cabello ondulado castaño y aretes dorados">
+      </figure>
+
+      <p class="portada-nota">
+        Cada profesional es aprobado por StyleBook antes de publicar sus servicios.
+      </p>
+
+    </div>
+  </div>
+</section>
+
+
+{% endblock %}

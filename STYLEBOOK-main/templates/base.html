@@ -1,0 +1,110 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>{% block titulo %}StyleBook{% endblock %}</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700&family=Playfair+Display:ital,wght@0,400;0,500;0,600;0,700;1,400&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/estilos.css') }}" />
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/tema.css') }}" />
+</head>
+<!-- INICIO AGREGADO JESUS: identificar la página principal. -->
+<body class="{% if request.endpoint == 'index' %}pagina-inicio{% endif %}">
+<!-- FIN AGREGADO JESUS: identificar la página principal. -->
+  {% set rol = session.get('rol') %}
+  <header class="barra">
+    
+      
+    <!-- INICIO AGREGADO JESUS: logo StyleBook. -->
+    <a href="{{ url_for('index') }}" class="marca logo-stylebook">
+        <span class="logo-stylebook-imagen" role="img" aria-label="StyleBook"></span>
+    </a>
+    <!-- FIN AGREGADO JESUS: logo StyleBook. -->
+
+
+    <button class="menu-boton" type="button" aria-expanded="false" aria-controls="menu-principal" aria-label="Abrir menú">
+      <svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" aria-hidden="true">
+        <path d="M4 7h16M4 12h16M4 17h16"/>
+      </svg>
+    </button>
+
+    <nav class="menu" id="menu-principal">
+      {# Menú según el tipo de cuenta: el catálogo es de clientes y visitantes; el proveedor ve solo su panel #}
+      {% set es_proveedor = rol in ['establecimiento', 'profesional'] %}
+      {% if not es_proveedor and rol != 'admin' %}
+        <a href="{{ url_for('servicios.catalogo') }}">Servicios</a>
+        <a href="{{ url_for('profesionales.listar') }}">Profesionales</a>
+      {% endif %}
+      {% if session.get('access_token') %}
+        {% if rol == 'cliente' %}
+          <a href="{{ url_for('citas.mis_citas') }}">Mis citas</a>
+        {% elif es_proveedor %}
+          <a href="{{ url_for('citas.agenda') }}">Mi agenda</a>
+          <a href="{{ url_for('servicios.gestionar') }}">Mis servicios</a>
+          <a href="{{ url_for('horarios.gestionar') }}">Mi horario</a>
+          <a href="{{ url_for('profesionales.editar_negocio') }}">Mi negocio</a>
+        {% elif rol == 'admin' %}
+          <a href="{{ url_for('admin.panel') }}">Panel admin</a>
+        {% endif %}
+        {% if rol != 'admin' %}
+          {% set pendientes = notificaciones_sin_leer() %}
+          <a href="{{ url_for('notificaciones.listar') }}" class="icono-notif" title="Notificaciones"
+             aria-label="Notificaciones{% if pendientes %} ({{ pendientes }} sin leer){% endif %}">
+            <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.8"
+                 stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/>
+              <path d="M13.73 21a2 2 0 0 1-3.46 0"/>
+            </svg>{% if pendientes %}<span class="globito">{{ pendientes }}</span>{% endif %}
+          </a>
+        {% endif %}
+        {% set etiquetas_rol = {'cliente': 'Cliente', 'profesional': 'Profesional', 'establecimiento': 'Establecimiento', 'admin': 'Administrador'} %}
+        {% set nombre_usuario = session.get('nombre') or 'Mi cuenta' %}
+        <a href="{{ url_for('perfil.ver') }}" class="menu-usuario" title="Mi perfil">
+          <span class="menu-usuario-inicial" aria-hidden="true">{{ nombre_usuario[:1]|upper }}</span>
+          <span class="menu-usuario-texto">
+            <strong>{{ nombre_usuario }}</strong>
+            <small>{{ etiquetas_rol.get(rol, 'Usuario') }}</small>
+          </span>
+        </a>
+        <a href="{{ url_for('auth.logout') }}" class="menu-salir">Cerrar sesión</a>
+      {% else %}
+        <a href="{{ url_for('auth.login') }}">Iniciar sesión</a>
+        <a href="{{ url_for('auth.registro') }}" class="menu-cta">Registrarme</a>
+      {% endif %}
+    </nav>
+  </header>
+
+  <main class="contenido">
+    {% with mensajes = get_flashed_messages(with_categories=true) %}
+      {% if mensajes %}
+        <div class="mensajes">
+          {% for categoria, mensaje in mensajes %}
+            <p class="mensaje mensaje-{{ categoria }}">{{ mensaje }}</p>
+          {% endfor %}
+        </div>
+      {% endif %}
+    {% endwith %}
+
+    {% block contenido %}{% endblock %}
+  </main>
+
+  <footer class="pie">
+    <p class="pie-base">StyleBook &middot; Cuida tu estilo</p>
+  </footer>
+
+  <script>
+    (function () {
+      var barra = document.querySelector(".barra");
+      var boton = document.querySelector(".menu-boton");
+      if (!barra || !boton) return;
+      boton.addEventListener("click", function () {
+        var abierto = barra.classList.toggle("menu-abierto");
+        boton.setAttribute("aria-expanded", abierto ? "true" : "false");
+        boton.setAttribute("aria-label", abierto ? "Cerrar menú" : "Abrir menú");
+      });
+    })();
+  </script>
+</body>
+</html>

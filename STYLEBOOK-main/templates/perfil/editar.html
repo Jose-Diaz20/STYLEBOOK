@@ -1,0 +1,118 @@
+
+{% extends "base.html" %}
+{% block titulo %}Editar perfil · StyleBook{% endblock %}
+{% block contenido %}
+
+<!-- INICIO AGREGADO JESUS: Página de edición de perfil -->
+<section class="editar-perfil-pagina">
+
+  <div class="editar-perfil-hero">
+    <div>
+      <span class="editar-perfil-eyebrow">STYLEBOOK · MI CUENTA</span>
+      <h1>Editar perfil</h1>
+      <p>Actualiza tus datos personales y mantén tu información al día.</p>
+    </div>
+
+    <div class="editar-perfil-hero-icono">✦</div>
+  </div>
+
+  <div class="editar-perfil-contenedor">
+
+    <div class="editar-perfil-card">
+
+      <div class="editar-perfil-titulo">
+        <div class="editar-perfil-icono">♙</div>
+        <div>
+          <h2>Información personal</h2>
+          <p>Modifica los datos asociados a tu cuenta.</p>
+        </div>
+      </div>
+
+      <form method="POST" class="editar-perfil-formulario">
+
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}" />
+
+        <div class="editar-perfil-avatar">
+          <span>{{ perfil.nombre[0]|upper }}</span>
+          <div>
+            <strong>{{ perfil.nombre }}</strong>
+            <small>Tu perfil en StyleBook</small>
+          </div>
+        </div>
+
+        <div class="editar-perfil-campo">
+          <label for="nombre">Nombre completo</label>
+          <input
+            type="text"
+            id="nombre"
+            name="nombre"
+            maxlength="100"
+            value="{{ perfil.nombre }}"
+            placeholder="Escribe tu nombre completo"
+            required
+          />
+        </div>
+
+        <div class="editar-perfil-campo">
+          <label for="telefono">Teléfono</label>
+          <input
+            type="tel"
+            id="telefono"
+            name="telefono"
+            maxlength="10"
+            minlength="10"
+            pattern="[0-9]{10}"
+            inputmode="numeric"
+            value="{{ perfil.telefono or '' }}"
+            placeholder="Celular (10 dígitos)"
+            required
+          />
+          <small>Este dato permite mantener actualizada tu información de contacto.</small>
+        </div>
+
+        <div class="editar-perfil-campo">
+          <label for="direccion">Dirección</label>
+          <input
+            type="text"
+            id="direccion"
+            name="direccion"
+            maxlength="200"
+            value="{{ perfil.direccion or '' }}"
+            placeholder="Ej. Calle 10 # 5-30, Cúcuta"
+            autocomplete="street-address"
+            required
+          />
+          <small>Formato: vía # número-número, ciudad. Ej.: Avenida 4E # 9-20, Cúcuta</small>
+        </div>
+
+        <div class="editar-perfil-acciones">
+          <a href="{{ url_for('perfil.ver') }}" class="editar-perfil-volver">
+            Cancelar
+          </a>
+
+          <button type="submit" class="editar-perfil-guardar">
+            Guardar cambios <span>→</span>
+          </button>
+        </div>
+
+      </form>
+
+    </div>
+
+    <div class="editar-perfil-consejo">
+      <span>✧</span>
+      <div>
+        <strong>Mantén tus datos actualizados</strong>
+        <p>
+          Verifica que tu nombre y teléfono estén correctamente escritos
+          para que tu información personal se mantenga actualizada.
+        </p>
+      </div>
+    </div>
+
+  </div>
+
+</section>
+<!-- FIN AGREGADO JESUS: Página de edición de perfil -->
+
+{% endblock %}

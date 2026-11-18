@@ -1,0 +1,79 @@
+{% extends "base.html" %}
+{% block titulo %}{{ "Editar" if servicio and servicio.get('id') else "Nuevo" }} servicio · StyleBook{% endblock %}
+{% block contenido %}
+  <h1>{{ "Editar servicio" if servicio and servicio.get('id') else "Nuevo servicio" }}</h1>
+
+  <!-- INICIO AGREGADO JESUS: formulario compatible con carga de imágenes. -->
+<form method="post" enctype="multipart/form-data">
+<!-- FIN AGREGADO JESUS: formulario compatible con carga de imágenes. -->
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}" />
+        <!-- INICIO AGREGADO JESUS: campo obligatorio para la imagen del servicio. -->
+
+    <label for="imagen">
+        Imagen del servicio
+
+        {% if not (servicio and servicio.get('id')) %}
+            <span aria-hidden="true">*</span>
+        {% else %}
+            <small>(Opcional para reemplazar la imagen actual)</small>
+        {% endif %}
+    </label>
+
+    {% if servicio and servicio.get('imagen_url') %}
+
+        <div class="vista-previa-servicio">
+
+            <img
+                src="{{ servicio.imagen_url }}"
+                alt="Imagen actual de {{ servicio.nombre }}"
+            >
+
+            <p>Imagen actual del servicio</p>
+
+        </div>
+
+    {% endif %}
+
+    <input
+        type="file"
+        id="imagen"
+        name="imagen"
+        accept="image/jpeg,image/png,image/webp"
+        {% if not (servicio and servicio.get('id')) %}
+            required
+        {% endif %}
+    >
+
+    <small>
+        Formatos permitidos: JPG, PNG o WEBP.
+        Tamaño máximo: 5 MB.
+    </small>
+
+    <!-- FIN AGREGADO JESUS: campo obligatorio para la imagen del servicio. -->
+    <label for="nombre">Nombre del servicio</label>
+    <input type="text" id="nombre" name="nombre" required maxlength="100"
+           value="{{ servicio.nombre if servicio else '' }}"
+           placeholder="Ej. Corte clásico, Manicure spa">
+
+    <label for="categoria">Categoría</label>
+    <select id="categoria" name="categoria">
+      {% for c in categorias %}
+        <option value="{{ c }}" {% if servicio and servicio.categoria == c %}selected{% endif %}>{{ c|capitalize }}</option>
+      {% endfor %}
+    </select>
+
+    <label for="descripcion">Descripción</label>
+    <textarea id="descripcion" name="descripcion" rows="3" maxlength="500">{{ servicio.descripcion or '' if servicio else '' }}</textarea>
+
+    <label for="precio">Precio</label>
+    <input type="number" id="precio" name="precio" step="0.01" min="0.01" required
+           value="{{ servicio.precio if servicio else '' }}">
+
+    <label for="duracion_min">Duración (minutos)</label>
+    <input type="number" id="duracion_min" name="duracion_min" min="10" max="480" required
+           value="{{ servicio.duracion_min if servicio else '' }}">
+
+    <button type="submit">{{ "Guardar cambios" if servicio and servicio.get('id') else "Agregar servicio" }}</button>
+  </form>
+  <p><a href="{{ url_for('servicios.gestionar') }}">Volver a mis servicios</a></p>
+{% endblock %}

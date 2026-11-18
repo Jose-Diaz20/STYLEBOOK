@@ -1,0 +1,204 @@
+"""
+RF-04 Registro de proveedor (establecimiento o profesional independiente)
+RF-07 Consultar proveedor (perfil público: servicios, precios, horarios, ubicación, disponibilidad)
+"""
+from datetime import datetime, timedelta
+
+from flask import Blueprint, abort, render_template, request, redirect, url_for, session, flash
+
+from supabase_client import sb
+from disponibilidad import ZONA, ahora_local, franjas_por_dia, parsear_fecha
+from utilidades import (
+    exigir_proveedor, cliente_sesion, primero, proveedor_propio,
+    telefono_valido, direccion_valida, mensaje_error, MSG_TELEFONO, MSG_DIRECCION,
+)
+
+profesionales_bp = Blueprint("profesionales", __name__)
+
+DIAS = ["Lunes", "Martes", "Miércoles", "Jueves", "Viernes", "Sábado", "Domingo"]
+DIAS_VISTA_PREVIA = 7   # días de disponibilidad que se muestran en el perfil
+
+
+def proveedor_aprobado(profesional_id):
+    """Fila del proveedor si existe, está aprobado por el admin y está activo; si no, None."""
+    return primero(sb.table("profesionales").select("*")
+                   .eq("id", profesional_id).eq("estado", "aprobado").eq("activo", True)
+                   .limit(1).execute())
+
+def _fecha_opinion(texto):
+    """'2026-11-03T15:20:00+00:00' (UTC) → '03/11/2026' en hora de Colombia."""
+    texto = str(texto or "")
+    try:
+        return datetime.fromisoformat(texto.replace("Z", "+00:00")).astimezone(ZONA).strftime("%d/%m/%Y")
+    except ValueError:
+        f = parsear_fecha(texto[:10])
+        return f.strftime("%d/%m/%Y") if f else ""
+
+@profesionales_bp.route("/profesionales")
+def listar():
+    """RF-07: cualquiera puede consultar la lista de proveedores aprobados."""
+    respuesta = sb.table("profesionales").select("*").eq(
+        "estado", "aprobado").eq("activo", True).order("creado_en").execute()
+    return render_template("profesionales/listar.html", profesionales=respuesta.data)
+
+
+@profesionales_bp.route("/profesionales/<profesional_id>")
+def detalle(profesional_id):
+    """RF-07: perfil público con servicios, precios, horarios, ubicación y disponibilidad."""
+    profesional = proveedor_aprobado(profesional_id)
+    if profesional is None:
+        abort(404)
+
+    servicios = sb.table("servicios").select("*").eq(
+        "profesional_id", profesional_id).eq("activo", True).order("nombre").execute().data
+    horarios = sb.table("horarios_profesional").select("*").eq(
+        "profesional_id", profesional_id).order("dia_semana").order("hora_inicio").execute().data
+
+    disponibilidad, duracion_ref = [], None
+    if servicios and horarios:
+        duracion_ref = min(s["duracion_min"] for s in servicios)
+        ahora = ahora_local()
+        try:
+            por_dia = franjas_por_dia(
+                sb, profesional_id, ahora.date(),
+                ahora.date() + timedelta(days=DIAS_VISTA_PREVIA - 1), duracion_ref, ahora=ahora)
+            disponibilidad = [
+                {"fecha": f, "dia": DIAS[f.weekday()], "horas": h}
+                for f, h in por_dia.items() if h
+            ]
+        except Exception as error:
+            mensaje_error(error)   # queda en el log; la página se muestra sin vista previa
+
+    # HU-15: opiniones públicas, de la más reciente a la más antigua (CA-04)
+    opiniones = []
+    # ?servicio=<id> muestra solo las opiniones de ese servicio (se ignora si no es de este proveedor)
+    filtro = request.args.get("servicio", "")
+    servicio_filtrado = next((s for s in servicios if str(s["id"]) == filtro), None)
+    try:
+        consulta = sb.table("calificaciones").select(
+            "puntuacion, comentario, cliente_nombre, servicio_nombre, creado_en"
+        ).eq("profesional_id", profesional_id)
+        if servicio_filtrado:
+            consulta = consulta.eq("servicio_id", servicio_filtrado["id"])
+        opiniones = consulta.order("creado_en", desc=True).limit(50).execute().data
+        for o in opiniones:
+            o["fecha_txt"] = _fecha_opinion(o["creado_en"])
+    except Exception as error:
+        mensaje_error(error)   # queda en el log; el perfil se muestra sin opiniones
+        opiniones = []
+
+    return render_template(
+        "profesionales/detalle.html", profesional=profesional, servicios=servicios,
+        horarios=horarios, dias=DIAS, disponibilidad=disponibilidad, duracion_ref=duracion_ref,
+        opiniones=opiniones, servicio_filtrado=servicio_filtrado,
+    )
+
+
+def _leer_negocio():
+    """Lee y valida el formulario del negocio. Devuelve (datos, error)."""
+    nombre_negocio = request.form.get("nombre_negocio", "").strip()
+    especialidad = request.form.get("especialidad", "").strip()
+    descripcion = request.form.get("descripcion", "").strip()
+    ubicacion = request.form.get("ubicacion", "").strip()
+    telefono = request.form.get("telefono", "").strip()
+
+    if not nombre_negocio or not especialidad or not ubicacion or not telefono:
+        return None, "Nombre, especialidad, ubicación y teléfono de contacto son obligatorios."
+    if len(nombre_negocio) > 100 or len(especialidad) > 100 or len(ubicacion) > 200:
+        return None, "Alguno de los textos es demasiado largo."
+    if len(descripcion) > 1000:
+        return None, "La descripción no puede superar 1000 caracteres."
+    if not telefono_valido(telefono):
+        return None, MSG_TELEFONO
+    if not direccion_valida(ubicacion):
+        return None, MSG_DIRECCION
+    try:
+        anios = int(request.form.get("anios_experiencia") or 0)
+    except ValueError:
+        return None, "Los años de experiencia deben ser un número."
+    if not 0 <= anios <= 80:
+        return None, "Los años de experiencia deben estar entre 0 y 80."
+
+    return {
+        "nombre_negocio": nombre_negocio, "especialidad": especialidad,
+        "descripcion": descripcion, "ubicacion": ubicacion,
+        "telefono": telefono, "anios_experiencia": anios,
+    }, None
+
+
+@profesionales_bp.route("/mi-negocio/registro", methods=["GET", "POST"])
+@exigir_proveedor
+def registro():
+    """RF-04: el establecimiento o profesional independiente registra su negocio."""
+    sb_usuario = cliente_sesion()
+    if proveedor_propio(sb_usuario) is not None:
+        return redirect(url_for("profesionales.editar_negocio"))
+
+    if request.method == "GET":
+        return render_template("profesionales/registro.html", negocio=None)
+
+    datos, error = _leer_negocio()
+    if error:
+        flash(error, "error")
+        return render_template("profesionales/registro.html", negocio=request.form)
+
+    datos["perfil_id"] = session["user_id"]
+    datos["tipo_proveedor"] = "establecimiento" if session["rol"] == "establecimiento" else "independiente"
+    try:
+        sb_usuario.table("profesionales").insert(datos).execute()
+    except Exception as e:
+        flash(mensaje_error(e, "No se pudo registrar tu negocio."), "error")
+        return render_template("profesionales/registro.html", negocio=request.form)
+
+    flash("Negocio registrado. Un administrador lo revisará antes de publicarlo. "
+          "Mientras tanto ya puedes cargar servicios y horarios.", "success")
+    return redirect(url_for("servicios.gestionar"))
+
+
+@profesionales_bp.route("/mi-negocio", methods=["GET", "POST"])
+@exigir_proveedor
+def editar_negocio():
+    """RF-03/RF-19: el proveedor mantiene actualizados los datos de su negocio."""
+    sb_usuario = cliente_sesion()
+    negocio = proveedor_propio(sb_usuario)
+    if negocio is None:
+        return redirect(url_for("profesionales.registro"))
+
+    if request.method == "GET":
+        return render_template("profesionales/registro.html", negocio=negocio)
+
+    datos, error = _leer_negocio()
+    if error:
+        flash(error, "error")
+        return render_template("profesionales/registro.html", negocio=request.form)
+
+    try:
+        sb_usuario.table("profesionales").update(datos).eq("id", negocio["id"]).execute()
+    except Exception as e:
+        flash(mensaje_error(e), "error")
+        return render_template("profesionales/registro.html", negocio=request.form)
+
+    flash("Datos del negocio actualizados.", "success")
+    return redirect(url_for("perfil.ver"))
+
+@profesionales_bp.route("/mi-negocio/activo", methods=["POST"])
+@exigir_proveedor
+def cambiar_activo():
+    """HU-10: el proveedor se marca activo o inactivo. Inactivo = no recibe reservas nuevas."""
+    sb_usuario = cliente_sesion()
+    negocio = proveedor_propio(sb_usuario)
+    if negocio is None:
+        return redirect(url_for("profesionales.registro"))
+
+    nuevo = not negocio.get("activo", True)
+    try:
+        sb_usuario.table("profesionales").update({"activo": nuevo}).eq(
+            "id", negocio["id"]).execute()
+    except Exception as error:
+        flash(mensaje_error(error), "error")
+        return redirect(url_for("profesionales.editar_negocio"))
+
+    flash("Quedaste activo: los clientes ya pueden reservar contigo." if nuevo
+          else "Quedaste inactivo: ya no apareces para nuevas reservas. "
+               "Tus citas actuales se conservan.", "success")
+    return redirect(url_for("profesionales.editar_negocio"))
