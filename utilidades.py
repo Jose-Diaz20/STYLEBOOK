@@ -19,8 +19,6 @@ log = logging.getLogger("stylebook")
 # RN-02: tipos de cuenta. "admin" es interno (se asigna desde la base de datos).
 ROLES_PROVEEDOR = ("establecimiento", "profesional")
 
-_RE_EMAIL = re.compile(r"^[^@\s]+@[^@\s]+\.[^@\s]+$")
-_RE_TELEFONO = re.compile(r"^\+?[0-9][0-9\s().-]{6,19}$")
 
 
 # ---------- Sesión y roles (RF-02, RN-03) ----------
@@ -137,13 +135,56 @@ def proveedor_propio(sb_usuario):
 
 # ---------- Validaciones (RN-04) ----------
 
+_RE_EMAIL = re.compile(r"^[A-Za-z0-9._%+\-]+@[A-Za-z0-9.\-]+\.[A-Za-z]{2,}$")
+DOMINIOS_CORREO = {"gmail.com", "hotmail.com", "outlook.com", "yahoo.com", "icloud.com", "live.com"}
+SUFIJOS_CORREO = (".edu.co", ".com.co")
+
+_RE_TELEFONO = re.compile(r"^[0-9]{10}$")
+
+# Dirección colombiana (estilo Cúcuta): vía + número # número-número[, complemento], ciudad
+_VIAS = r"(?:calle|cll?|carrera|cra|cr|kr|avenida|avda|av|diagonal|diag|dg|transversal|trans|tv|circular|autopista)"
+_NUM = r"[0-9]{1,3}\s?[a-z]{0,2}(?:\s+(?:bis|este|oeste|norte|sur))?"
+_RE_DIRECCION = re.compile(
+    rf"^{_VIAS}\.?\s+{_NUM}\s*(?:#|no\.?|n°)\s*{_NUM}\s*-\s*[0-9]{{1,3}}"
+    r"(?:\s*,\s*[^,]{2,60})?"
+    r"\s*,\s*[a-záéíóúüñ][a-záéíóúüñ .'\-]{2,39}$",
+    re.IGNORECASE,
+)
+
+MSG_DIRECCION = ("La dirección no tiene un formato válido. Usa: vía # número-número, ciudad. "
+                 "Ej.: Avenida 4E # 9-20, Cúcuta")
+MSG_TELEFONO = "El celular debe tener exactamente 10 dígitos, solo números."
+MSG_PASSWORD = "La contraseña debe tener mínimo 8 caracteres, con mayúsculas, minúsculas y números."
+MSG_CORREO = ("Escribe un correo válido de gmail, hotmail, outlook, yahoo, icloud, live "
+              "o un dominio .edu.co / .com.co.")
+
+
 def correo_valido(correo: str) -> bool:
-    return bool(_RE_EMAIL.match(correo or "")) and len(correo) <= 254
+    """Formato correcto y dominio permitido (comunes + .edu.co + .com.co)."""
+    correo = (correo or "").strip().lower()
+    if len(correo) > 254 or not _RE_EMAIL.match(correo):
+        return False
+    dominio = correo.rsplit("@", 1)[1]
+    return dominio in DOMINIOS_CORREO or dominio.endswith(SUFIJOS_CORREO)
 
 
 def telefono_valido(telefono: str) -> bool:
-    """El teléfono es opcional; si viene, debe tener un formato razonable."""
-    return not telefono or bool(_RE_TELEFONO.match(telefono))
+    """Celular obligatorio: exactamente 10 dígitos."""
+    return bool(_RE_TELEFONO.match(telefono or ""))
+
+
+def contrasena_valida(password: str) -> bool:
+    """Mínimo 8 caracteres, con minúscula, mayúscula y número."""
+    password = password or ""
+    return (8 <= len(password) <= 72
+            and re.search(r"[a-z]", password) is not None
+            and re.search(r"[A-Z]", password) is not None
+            and re.search(r"[0-9]", password) is not None)
+
+
+def direccion_valida(direccion: str) -> bool:
+    direccion = (direccion or "").strip()
+    return len(direccion) <= 200 and bool(_RE_DIRECCION.match(direccion))
 
 
 def destino_seguro(destino, por_defecto=None):

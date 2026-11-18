@@ -59,11 +59,30 @@
             type="tel"
             id="telefono"
             name="telefono"
-            maxlength="20"
+            maxlength="10"
+            minlength="10"
+            pattern="[0-9]{10}"
+            inputmode="numeric"
             value="{{ perfil.telefono or '' }}"
-            placeholder="Escribe tu número de teléfono"
+            placeholder="Celular (10 dígitos)"
+            required
           />
           <small>Este dato permite mantener actualizada tu información de contacto.</small>
+        </div>
+
+        <div class="editar-perfil-campo">
+          <label for="direccion">Dirección</label>
+          <input
+            type="text"
+            id="direccion"
+            name="direccion"
+            maxlength="200"
+            value="{{ perfil.direccion or '' }}"
+            placeholder="Ej. Calle 10 # 5-30, Cúcuta"
+            autocomplete="street-address"
+            required
+          />
+          <small>Formato: vía # número-número, ciudad. Ej.: Avenida 4E # 9-20, Cúcuta</small>
         </div>
 
         <div class="editar-perfil-acciones">

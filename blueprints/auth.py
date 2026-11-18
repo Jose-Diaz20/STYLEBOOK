@@ -6,8 +6,9 @@ import logging
 
 from supabase_client import cliente_anonimo, sb_como_usuario
 from utilidades import (
-    ROLES_PROVEEDOR, cliente_sesion, correo_valido, telefono_valido, destino_seguro,
-    mensaje_error, primero, proveedor_propio,
+    ROLES_PROVEEDOR, cliente_sesion, correo_valido, telefono_valido, contrasena_valida,
+    direccion_valida, destino_seguro, mensaje_error, primero, proveedor_propio,
+    MSG_DIRECCION, MSG_TELEFONO, MSG_PASSWORD, MSG_CORREO,
 )
 
 log = logging.getLogger("stylebook")
@@ -31,6 +32,7 @@ def registro():
         "nombre": request.form.get("nombre", "").strip(),
         "email": request.form.get("email", "").strip().lower(),
         "telefono": request.form.get("telefono", "").strip(),
+        "direccion": " ".join(request.form.get("direccion", "").split()),
         "tipo_cuenta": request.form.get("tipo_cuenta", "cliente"),
     }
     password = request.form.get("password", "")
@@ -41,19 +43,21 @@ def registro():
 
     if form["tipo_cuenta"] not in TIPOS_CUENTA:   # 'admin' nunca es elegible
         return volver("Elige un tipo de cuenta válido.")
-    if not form["nombre"] or not form["email"] or not password:
-        return volver("Nombre, correo y contraseña son obligatorios.")
+    if not all([form["nombre"], form["email"], form["telefono"], form["direccion"], password]):
+        return volver("Todos los campos son obligatorios.")
     if len(form["nombre"]) > 100:
         return volver("El nombre es demasiado largo.")
     if not correo_valido(form["email"]):
-        return volver("Escribe un correo electrónico válido.")
+        return volver(MSG_CORREO)
     if not telefono_valido(form["telefono"]):
-        return volver("El teléfono no es válido (solo números, espacios, + y guiones).")
-    if len(password) < 6:
-        return volver("La contraseña debe tener al menos 6 caracteres.")
+        return volver(MSG_TELEFONO)
+    if not direccion_valida(form["direccion"]):
+        return volver(MSG_DIRECCION)
+    if not contrasena_valida(password):
+        return volver(MSG_PASSWORD)
 
     try:
-        # Nombre, teléfono y tipo de cuenta viajan en el sign_up; el trigger crear_perfil()
+        # Nombre, teléfono, dirección y tipo de cuenta viajan en el sign_up; el trigger crear_perfil()
         # los guarda, así funciona igual si Supabase exige confirmar el correo.
         resultado = cliente_anonimo().auth.sign_up({   # cliente aislado: no contamina el compartido
             "email": form["email"],
@@ -61,6 +65,7 @@ def registro():
             "options": {"data": {
                 "nombre": form["nombre"],
                 "telefono": form["telefono"],
+                "direccion": form["direccion"],
                 "tipo_cuenta": form["tipo_cuenta"],
             }},
         })

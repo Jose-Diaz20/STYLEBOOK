@@ -67,11 +67,13 @@
             <input type="text" id="ubicacion" name="ubicacion" maxlength="200"
                    placeholder="Ej. Cra 5 # 10-20, Cúcuta"
                    value="{{ negocio.ubicacion or '' if negocio else '' }}" required />
+            <span class="mi-negocio-ayuda">Formato: vía # número-número, ciudad. Ej.: Avenida 4E # 9-20, Cúcuta</span>
           </div>
 
           <div class="mi-negocio-campo">
             <label for="telefono">Teléfono de contacto</label>
-            <input type="tel" id="telefono" name="telefono" maxlength="20"
+            <input type="tel" id="telefono" name="telefono" maxlength="10" minlength="10"
+                   pattern="[0-9]{10}" inputmode="numeric"
                    value="{{ negocio.telefono or '' if negocio else '' }}" required />
           </div>
 

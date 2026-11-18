@@ -10,7 +10,7 @@ from supabase_client import sb
 from disponibilidad import ZONA, ahora_local, franjas_por_dia, parsear_fecha
 from utilidades import (
     exigir_proveedor, cliente_sesion, primero, proveedor_propio,
-    telefono_valido, mensaje_error,
+    telefono_valido, direccion_valida, mensaje_error, MSG_TELEFONO, MSG_DIRECCION,
 )
 
 profesionales_bp = Blueprint("profesionales", __name__)
@@ -109,7 +109,9 @@ def _leer_negocio():
     if len(descripcion) > 1000:
         return None, "La descripción no puede superar 1000 caracteres."
     if not telefono_valido(telefono):
-        return None, "El teléfono no es válido (solo números, espacios, + y guiones)."
+        return None, MSG_TELEFONO
+    if not direccion_valida(ubicacion):
+        return None, MSG_DIRECCION
     try:
         anios = int(request.form.get("anios_experiencia") or 0)
     except ValueError:

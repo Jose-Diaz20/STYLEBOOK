@@ -66,19 +66,43 @@
                     />
                 </div>
 
-                <label for="telefono">Teléfono</label>
+                <label for="telefono">Celular</label>
                 <div class="auth-campo">
                     <span aria-hidden="true">☎</span>
                     <input
                         type="tel"
                         id="telefono"
                         name="telefono"
-                        maxlength="20"
-                        placeholder="Teléfono"
+                        maxlength="10"
+                        minlength="10"
+                        pattern="[0-9]{10}"
+                        inputmode="numeric"
+                        title="Escribe los 10 dígitos de tu celular, sin espacios"
+                        placeholder="Celular (10 dígitos)"
                         value="{{ form.get('telefono', '') }}"
                         autocomplete="tel"
+                        required
                     />
                 </div>
+
+                <label for="direccion">Dirección</label>
+                <div class="auth-campo">
+                    <span aria-hidden="true">⌖</span>
+                    <input
+                        type="text"
+                        id="direccion"
+                        name="direccion"
+                        maxlength="200"
+                        placeholder="Ej. Calle 10 # 5-30, Cúcuta"
+                        value="{{ form.get('direccion', '') }}"
+                        autocomplete="street-address"
+                        required
+                    />
+                </div>
+                <p class="auth-ayuda">
+                    Formato: vía # número-número, ciudad.
+                    Ej.: Avenida 4E # 9-20, Cúcuta
+                </p>
 
                 <label for="email">Correo electrónico</label>
                 <div class="auth-campo">
@@ -101,8 +125,10 @@
                         type="password"
                         id="password"
                         name="password"
-                        minlength="6"
-                        placeholder="Contraseña"
+                        minlength="8"
+                        pattern="(?=.*[a-z])(?=.*[A-Z])(?=.*[0-9]).{8,}"
+                        title="Mínimo 8 caracteres, con mayúsculas, minúsculas y números"
+                        placeholder="Contraseña (mín. 8, mayúscula, minúscula y número)"
                         autocomplete="new-password"
                         required
                     />

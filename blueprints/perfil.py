@@ -3,7 +3,7 @@ from flask import Blueprint, render_template, request, redirect, url_for, sessio
 
 from utilidades import (
     ROLES_PROVEEDOR, exigir_sesion, cliente_sesion, primero, proveedor_propio,
-    telefono_valido, mensaje_error,
+    telefono_valido, direccion_valida, mensaje_error, MSG_TELEFONO, MSG_DIRECCION,
 )
 
 perfil_bp = Blueprint("perfil", __name__)
@@ -39,19 +39,24 @@ def editar():
 
     nombre = request.form.get("nombre", "").strip()
     telefono = request.form.get("telefono", "").strip()
+    direccion = " ".join(request.form.get("direccion", "").split())
 
     if not nombre or len(nombre) > 100:
         flash("El nombre es obligatorio (máximo 100 caracteres).", "error")
         return redirect(url_for("perfil.editar"))
     if not telefono_valido(telefono):
-        flash("El teléfono no es válido (solo números, espacios, + y guiones).", "error")
+        flash(MSG_TELEFONO, "error")
+        return redirect(url_for("perfil.editar"))
+    if not direccion_valida(direccion):
+        flash(MSG_DIRECCION, "error")
         return redirect(url_for("perfil.editar"))
 
     try:
-        # Solo nombre y teléfono; el tipo de cuenta (rol) no se toca y además lo protege la base.
+        # Solo nombre, teléfono y dirección; el tipo de cuenta (rol) no se toca y además lo protege la base.
         sb_usuario.table("perfiles").update({
             "nombre": nombre,
             "telefono": telefono or None,
+            "direccion": direccion,
         }).eq("id", session["user_id"]).execute()
     except Exception as error:
         flash(mensaje_error(error), "error")
